@@ -13,6 +13,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Trust the reverse proxy (ngrok/production load balancer) so generated
+        // asset URLs use the public HTTPS scheme instead of HTTP.
+        $middleware->trustProxies(at: '*');
         $middleware->alias(['admin' => \App\Http\Middleware\EnsureAdmin::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

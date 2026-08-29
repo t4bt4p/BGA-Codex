@@ -10,11 +10,23 @@ use App\Http\Controllers\API\BoardgameController;
 use App\Http\Controllers\API\TransactionController;
 use App\Http\Controllers\API\RentalController; 
 use App\Http\Controllers\API\UserController;
+use App\Http\Controllers\API\OpnWebhookController;
+use App\Http\Controllers\API\ReportController;
 
 use App\Services\BlockchainService; // 
 
-// เส้นทางสำหรับ Login (ใครก็เข้าถึงได้)
+// 🎯 เพิ่มเส้นทางสำหรับแอดมิน
+Route::post('/admin/login', [AuthController::class, 'adminLogin']);
+
+// เส้นทางสำหรับ Login 
 Route::post('/login', [AuthController::class, 'login']);
+// เส้นทางสำหรับ สมัครสมาชิก 
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/webhooks/opn', [OpnWebhookController::class, 'handle']);
+
+// รายการสำหรับผู้เยี่ยมชม: ดูเกมได้ก่อนสมัคร แต่ทำธุรกรรมต้องยืนยันตัวตน
+Route::get('/categories', [BoardgameCategoryController::class, 'index']);
+Route::get('/boardgames', [BoardgameController::class, 'index']);
 
 // เส้นทางที่ต้องใช้ Token (บัตรผ่าน) ถึงจะเข้าได้
 Route::middleware('auth:sanctum')->group(function () {
@@ -24,46 +36,27 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // ดึงข้อมูล User ปัจจุบัน (Laravel ใส่มาให้เป็นค่าเริ่มต้น เก็บไว้ได้ครับ)
     Route::get('/user', function (Request $request) {
-        return $request->user();
+        return $request->user()->load('wallet'); // โหลดความสัมพันธ์ wallet ด้วย
+    });
+
+    Route::get('/rentals/active', [RentalController::class, 'myActiveRentals']);
+    Route::post('/rentals/rent', [RentalController::class, 'rentGame']);
+    Route::post('/rentals/return', [RentalController::class, 'returnGame']);
+    Route::get('/transactions', [TransactionController::class, 'index']);
+    Route::post('/topups', [RentalController::class, 'createTopupRequest']);
+
+    Route::middleware('admin')->group(function () {
+        Route::post('/categories', [BoardgameCategoryController::class, 'store']);
+        Route::post('/boardgames', [BoardgameController::class, 'store']);
+        Route::delete('/boardgames/{id}', [BoardgameController::class, 'destroy']);
+        Route::put('/boardgames/{id}', [BoardgameController::class, 'update']);
+        Route::get('/users', [UserController::class, 'index']);
+        Route::put('/users/{id}/status', [UserController::class, 'updateStatus']);
+        Route::put('/users/{id}/wallet', [UserController::class, 'updateWallet']);
+        Route::get('/topups', [RentalController::class, 'topupRequests']);
+        Route::post('/topups/{topup}/approve', [RentalController::class, 'approveTopup']);
+        Route::get('/blockchain/verify', function(BlockchainService $blockchain) { return response()->json($blockchain->verifyChain()); });
+        Route::get('/reports/dashboard', [ReportController::class, 'dashboard']);
     });
 
 });
-
-// เส้นทางสำหรับจัดการหมวดหมู่บอร์ดเกม (ต้องล็อกอินก่อนถึงจะจัดการได้)
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/categories', [BoardgameCategoryController::class, 'index']);
-    Route::post('/categories', [BoardgameCategoryController::class, 'store']);
-
-    // เส้นทางสำหรับจัดการบอร์ดเกม (ต้องล็อกอินก่อน)
-    Route::get('/boardgames', [BoardgameController::class, 'index']);
-    Route::post('/boardgames', [BoardgameController::class, 'store']);
-
-    // เส้นทางสำหรับลบบอร์ดเกม (ต้องล็อกอินก่อน)
-    Route::delete('/boardgames/{id}', [BoardgameController::class, 'destroy']);
-    // เส้นทางสำหรับแก้ไขบอร์ดเกม (ต้องล็อกอินก่อน)
-    Route::put('/boardgames/{id}', [BoardgameController::class, 'update']);
-
-    // เส้นทางสำหรับจัดการผู้ใช้ (ต้องล็อกอินก่อน)
-    Route::get('/users', [UserController::class, 'index']);
-    Route::put('/users/{id}/status', [UserController::class, 'updateStatus']);
-
-    // 📌 เพิ่มเส้นทางนี้สำหรับจัดการ Wallet
-    Route::put('/users/{id}/wallet', [UserController::class, 'updateWallet']);
-
-
-    // เพิ่มต่อจาก route ของ user
-    Route::get('/transactions', [TransactionController::class, 'index']);
-    
-
-    // เพิ่ม 2 เส้นทางนี้สำหรับจัดการเช่าและคืน
-    Route::post('/rentals/rent', [RentalController::class, 'rentGame']);
-    Route::post('/rentals/return', [RentalController::class, 'returnGame']);
-
-});
-
-Route::get('/blockchain/verify', function(BlockchainService $blockchain) {
-    return response()->json($blockchain->verifyChain());
-});
-
-Route::post('/wallet/topup', [RentalController::class, 'topupWallet']);
-

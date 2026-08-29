@@ -64,7 +64,9 @@ class UserController extends Controller
 
         $wallet = $user->wallet;
         $amount = $request->amount;
-        $transactionType = $request->action === 'add' ? 'Topup (Admin)' : 'Deduct (Admin)';
+        
+        // 🎯 [แก้ไขแล้ว] เปลี่ยนให้คำตรงกับหน้า Vue (History.vue) 
+        $transactionType = $request->action === 'add' ? 'topup_credit' : 'admin_debit';
 
         if ($request->action === 'add') {
             // เติมเงิน
@@ -95,7 +97,7 @@ class UserController extends Controller
             'User_id' => $user->User_id,
             'Bg_id' => null, // เป็น null เพราะไม่ได้เกี่ยวกับการเช่าเกม
             'T_cost' => $amount,
-            'T_type' => $transactionType,
+            'T_type' => $transactionType, // 👈 ตรงนี้จะถูกบันทึกเป็น 'เติมเงิน' แล้ว
         ]);
 
         // อัปเดตยอดเงินในกระเป๋า

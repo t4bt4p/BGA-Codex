@@ -15,15 +15,17 @@
                     <input type="text" class="form-control p-2" v-model="form.username" placeholder="กรอกชื่อผู้ใช้แอดมิน" required>
                 </div>
                 
-                <!-- ถ้ารหัสผิด ให้แสดงแจ้งเตือนตัวแดงๆ แทรกไว้ตรงนี้ได้เลยครับ -->
-                <div v-if="errorMessage" class="alert alert-danger small p-2 mb-3 text-center">
-                    {{ errorMessage }}
+                <!-- ถ้ารหัสผิด ให้แสดงแจ้งเตือนตัวแดงๆ แทรกไว้ตรงนี้ -->
+                <div v-if="errorMessage" class="alert alert-danger small p-2 mb-3 text-center border-0 rounded-3">
+                    <i class="fa-solid fa-triangle-exclamation me-1"></i> {{ errorMessage }}
                 </div>
+                
                 <div class="mb-4">
                     <label class="form-label small fw-bold">รหัสผ่าน</label>
                     <input type="password" class="form-control p-2" v-model="form.password" placeholder="••••••••" required>
                 </div>
-                <button type="submit" class="btn btn-success w-100 fw-bold py-2 rounded-3">
+                
+                <button type="submit" class="btn btn-success w-100 fw-bold py-2 rounded-3 shadow-sm">
                     เข้าสู่ระบบ
                 </button>
             </form>
@@ -32,17 +34,16 @@
 </template>
 
 <script>
-// นำเข้า axios เพื่อใช้ยิง API
 import axios from 'axios';
 
 export default {
     data() {
         return {
             form: {
-                username: '', // เปลี่ยนจาก email เป็น username ให้ตรงกับหลังบ้าน
+                username: '',
                 password: ''
             },
-            errorMessage: '' // เอาไว้แสดงข้อความถ้ารหัสผิด
+            errorMessage: '' 
         }
     },
     methods: {
@@ -51,23 +52,30 @@ export default {
                 // ล้างข้อความแจ้งเตือนเก่าก่อน
                 this.errorMessage = '';
 
-                // 1. ส่งข้อมูล username และ password ไปที่ API /api/login
-                const response = await axios.post('/api/login', {
+                // 1. ส่งข้อมูลไปที่ API แอดมิน
+                const response = await axios.post('/api/admin/login', {
                     username: this.form.username,
                     password: this.form.password
                 });
 
-                // 2. ถ้าสำเร็จ API จะตอบกลับมาพร้อม Token เราก็เก็บลง localStorage
+                // 2. ถ้าสำเร็จ เก็บ Token แล้ววาร์ปไปหน้า Dashboard
                 if (response.data.status === 'success') {
                     localStorage.setItem('admin_token', response.data.token);
+                    localStorage.removeItem('user_token');
                     
-                    // 3. พาผู้ใช้วาร์ปไปหน้า Dashboard แอดมิน
+                    window.Swal.fire({
+                        icon: 'success',
+                        title: 'ยินดีต้อนรับแอดมิน',
+                        showConfirmButton: false,
+                        timer: 1500
+                    });
+
                     this.$router.push({ name: 'admin.dashboard' });
                 }
             } catch (error) {
-                // 4. ถ้า API ตอบกลับมาเป็น Error (เช่น รหัสผิด 401)
-                if (error.response && error.response.status === 401) {
-                    this.errorMessage = 'ชื่อผู้ใช้ หรือ รหัสผ่าน ไม่ถูกต้องครับ';
+                // 3. ดักจับ Error 422 และ 401 เพื่อโชว์ข้อความตัวแดง (โดยไม่โดนเตะไปหน้าอื่น)
+                if (error.response && (error.response.status === 401 || error.response.status === 422)) {
+                    this.errorMessage = error.response.data.message || 'ชื่อผู้ใช้ หรือ รหัสผ่าน ไม่ถูกต้องครับ';
                 } else {
                     this.errorMessage = 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์';
                 }
@@ -77,3 +85,8 @@ export default {
     }
 }
 </script>
+
+<style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap');
+* { font-family: 'Sarabun', sans-serif; }
+</style>

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
 use App\Models\Transaction_tb;
 use App\Models\User; // 📌 เพิ่ม Model User เข้ามาเพื่อจัดการกระเป๋าเงิน
 use Carbon\Carbon;
@@ -50,31 +51,19 @@ class BlockchainService
 
     public function addTransaction($transactionData)
     {
-        $chain = json_decode(Storage::get($this->nodes[0]), true);
-        $lastBlock = end($chain);
-        
-        $newIndex = $lastBlock['index'] + 1;
-        $newTimestamp = now()->toIso8601String();
-        $newPreviousHash = $lastBlock['hash'];
-        
-        $newHash = $this->calculateHash($newIndex, $newTimestamp, $transactionData, $newPreviousHash);
-
-        $newBlock = [
-            'index' => $newIndex,
-            'timestamp' => $newTimestamp,
-            'data' => $transactionData, 
-            'previous_hash' => $newPreviousHash,
-            'hash' => $newHash
-        ];
-
-        $chain[] = $newBlock;
-        $jsonChain = json_encode($chain, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-
-        foreach ($this->nodes as $node) {
-            Storage::put($node, $jsonChain);
-        }
-
-        return $newBlock;
+        return Cache::lock('bga-blockchain-write', 10)->block(5, function () use ($transactionData) {
+            $chain = json_decode(Storage::get($this->nodes[0]), true);
+            $lastBlock = end($chain);
+            $newIndex = $lastBlock['index'] + 1;
+            $newTimestamp = now()->toIso8601String();
+            $newPreviousHash = $lastBlock['hash'];
+            $newHash = $this->calculateHash($newIndex, $newTimestamp, $transactionData, $newPreviousHash);
+            $newBlock = ['index'=>$newIndex,'timestamp'=>$newTimestamp,'data'=>$transactionData,'previous_hash'=>$newPreviousHash,'hash'=>$newHash];
+            $chain[] = $newBlock;
+            $jsonChain = json_encode($chain, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            foreach ($this->nodes as $node) Storage::put($node, $jsonChain);
+            return $newBlock;
+        });
     }
 
     public function verifyChain()
@@ -214,9 +203,9 @@ class BlockchainService
             $tx = $chain[$i]['data'];
             
             if ($tx['user_id'] == $userId) {
-                if ($tx['type'] === 'Topup (Admin)') {
+                if (in_array($tx['type'], ['topup_credit', 'Topup (Admin)'], true)) {
                     $realBalance += (float)$tx['cost']; // เติมเงิน (บวก)
-                } elseif (in_array($tx['type'], ['Deduct (Admin)', 'เช่าเกม', 'คืนเกม'])) {
+                } elseif (in_array($tx['type'], ['rental_debit', 'late_fee_debit', 'admin_debit', 'Deduct (Admin)', 'เช่าเกม', 'คืนเกม'], true)) {
                     // 👈 ย้าย 'คืนเกม' มารวมฝั่งลบ เพราะมันคือการหักค่าปรับ late_fee
                     $realBalance -= (float)$tx['cost']; 
                 }

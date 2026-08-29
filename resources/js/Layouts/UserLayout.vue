@@ -1,0 +1,221 @@
+<template>
+    <div class="d-flex justify-content-center bg-dark" style="min-height: 100vh; font-family: 'Sarabun', sans-serif;">
+        <!-- Mobile Container Wrapper -->
+        <div class="bg-light position-relative d-flex flex-column shadow-lg overflow-hidden"
+            style="width: 100%; max-width: 430px; height: 100vh;">
+
+            <!-- Header (Top Bar) -->
+            <header
+                class="bg-white sticky-top d-flex align-items-center justify-content-between px-3 py-3 border-bottom shadow-sm"
+                style="z-index: 1030;">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="bg-success rounded text-white d-flex align-items-center justify-content-center"
+                        style="width: 28px; height: 28px;">
+                        <i class="fa-solid fa-dice small"></i>
+                    </div>
+                    <span class="fw-bold fs-5 mb-0 text-dark" style="letter-spacing: -0.5px;">BGA<span
+                            class="text-success">Vault</span></span>
+                </div>
+
+                <div class="d-flex align-items-center gap-3">
+                    <div
+                        class="badge rounded-pill bg-success bg-opacity-10 text-success border border-success d-flex align-items-center gap-2 px-3 py-1">
+                        <!-- 🎯 ยอดเงินจะเปลี่ยนตรงนี้ทันทีแบบ Real-time -->
+                        <span class="fw-bold fs-6">{{ userProfile?.wallet?.Wallet_count || 0 }}</span>
+                        <div class="bg-success rounded-circle" style="width: 8px; height: 8px;"></div>
+                    </div>
+                    <img src="https://i.pravatar.cc/150?img=11" alt="Profile"
+                        class="rounded-circle border border-2 border-white shadow-sm"
+                        style="width: 32px; height: 32px; object-fit: cover;">
+                </div>
+            </header>
+
+            <!-- 🎯 Main Content Area (หน้า Home หรือ Profile จะมาโผล่ตรงนี้) -->
+            <main class="flex-grow-1 overflow-auto hide-scroll position-relative" style="padding-bottom: 90px;">
+                <router-view :userProfile="userProfile" @refresh-wallet="fetchUserProfile"></router-view>
+            </main>
+
+           <!-- Bottom Navigation -->
+            <nav class="position-absolute bottom-0 w-100 bg-white border-top d-flex justify-content-around align-items-center pt-2 px-2 shadow-lg"
+                style="z-index: 1040; padding-bottom: 24px;">
+
+                <!-- 1. หน้าแรก -->
+                <router-link :to="{ name: 'user.home' }"
+                    class="btn btn-link text-decoration-none d-flex flex-column align-items-center gap-1 p-2 transition-colors"
+                    style="width: 64px;"
+                    :class="$route.name === 'user.home' ? 'text-success' : 'text-muted'">
+                    <i class="fa-solid fa-house fs-5"></i>
+                    <span class="fw-bold" style="font-size: 10px;">หน้าแรก</span>
+                </router-link>
+
+                <!-- 2. เกมของฉัน -->
+                <router-link :to="{ name: 'user.mygames' }"
+                    class="btn btn-link text-decoration-none d-flex flex-column align-items-center gap-1 p-2 transition-colors"
+                    style="width: 64px;"
+                    :class="$route.name === 'user.mygames' ? 'text-success' : 'text-muted'">
+                    <i class="fa-solid fa-box-open fs-5"></i>
+                    <span class="fw-bold" style="font-size: 10px;">เกมของฉัน</span>
+                </router-link>
+
+                <!-- 3. ปุ่ม QR Code ตรงกลาง (Gradient) -->
+                <div class="position-relative" style="top: -28px;">
+                    <button @click="openTopupModal"
+                        class="btn rounded-circle shadow-lg d-flex align-items-center justify-content-center transition-transform"
+                        style="width: 64px; height: 64px; background: linear-gradient(to top right, #22c55e, #16a34a); border: 4px solid white;">
+                        <i class="fa-solid fa-qrcode text-white fs-3"></i>
+                    </button>
+                </div>
+
+                <!-- 4. ประวัติ -->
+                <router-link :to="{ name: 'user.history' }"
+                    class="btn btn-link text-decoration-none d-flex flex-column align-items-center gap-1 p-2 transition-colors"
+                    style="width: 64px;"
+                    :class="$route.name === 'user.history' ? 'text-success' : 'text-muted'">
+                    <i class="fa-solid fa-clock-rotate-left fs-5"></i>
+                    <span class="fw-bold" style="font-size: 10px;">ประวัติ</span>
+                </router-link>
+
+                <!-- 5. ฉัน (Profile) -->
+                <router-link :to="{ name: 'user.profile' }"
+                    class="btn btn-link text-decoration-none d-flex flex-column align-items-center gap-1 p-2 transition-colors"
+                    style="width: 64px;"
+                    :class="$route.name === 'user.profile' ? 'text-success' : 'text-muted'">
+                    <i class="fa-solid fa-user fs-5"></i>
+                    <span class="fw-bold" style="font-size: 10px;">ฉัน</span>
+                </router-link>
+
+            </nav>
+        </div>
+    </div>
+</template>
+
+<script>
+import axios from 'axios';
+import QRCode from 'qrcode';
+
+export default {
+    name: 'UserLayout',
+    data() {
+        return {
+            userProfile: null
+        }
+    },
+    async mounted() {
+        await this.fetchUserProfile();
+    },
+    methods: {
+        async fetchUserProfile() {
+            try {
+                const response = await axios.get('/api/user');
+                this.userProfile = response.data;
+            } catch (error) {
+                localStorage.removeItem('user_token');
+                // หน้าแรกดูรายการเกมได้โดยไม่ต้องล็อกอิน; หน้าอื่นให้ route guard จัดการ
+                if (this.$route.name !== 'user.home') {
+                    this.$router.push({ name: 'user.login' });
+                }
+            }
+        },
+
+        // สร้างคำขอเติมเงินและแสดง QR ตามยอดที่เลือก
+        openTopupModal() {
+            const amounts = [20, 50, 100, 500, 1000];
+            window.Swal.fire({
+                title: 'เติมโทเค่น',
+                width: '390px',
+                padding: '1rem',
+                html: `
+                    <div class="text-start rounded-3 bg-light px-3 py-2 mb-3 d-flex justify-content-between">
+                        <span class="text-muted">ยอดคงเหลือปัจจุบัน</span><strong>${(this.userProfile?.wallet?.Wallet_count || 0).toLocaleString()} <span class="text-success">◉</span></strong>
+                    </div>
+                    <p class="text-start fw-bold mb-2">ยอดคงเหลือปัจจุบัน</p>
+                    <div class="topup-grid mb-3">
+                        ${amounts.map((amount, i) => `
+                            <label class="topup-option ${i === 2 ? 'selected' : ''}" data-amount="${amount}">
+                                <input type="radio" name="topup_amount" value="${amount}" ${i === 2 ? 'checked' : ''}>
+                                <strong>+ ${amount.toLocaleString()}</strong><small>฿${amount.toLocaleString()}</small>
+                            </label>
+                        `).join('')}
+                    </div>
+                    <button id="create-topup-qr" type="button" class="btn btn-success w-100 mb-3">สร้าง QR สำหรับชำระเงิน</button>
+                    <div id="topup-qr-panel" class="qr-panel" style="display:none">
+                        <p class="text-muted small mb-2">สแกน QR Code เพื่อชำระเงิน <strong id="qr-amount" class="text-success">100</strong> บาท</p>
+                        <img id="topup-qr" alt="PromptPay QR" style="width:180px;height:180px;background:#fff;padding:10px;border-radius:16px;">
+                        <button id="download-topup-qr" type="button" class="btn btn-link text-success fw-bold text-decoration-none mt-2">⇩ บันทึกรูปภาพ</button>
+                    </div>
+                `,
+                showConfirmButton: false,
+                showCancelButton: false,
+                didOpen: () => {
+                    const createCharge = async (amount) => {
+                        try {
+                            const response = await axios.post('/api/topups', { amount });
+                            const scannable = response.data?.charge?.source?.scannable_code;
+                            const code = response.data?.charge?.qr_data || (typeof scannable === 'string' ? scannable : scannable?.image?.download_uri);
+                            const qr = document.getElementById('topup-qr');
+                            if (!code) throw new Error('Opn ไม่ได้ส่งภาพ QR กลับมา');
+                            qr.src = code.startsWith('data:') ? code : code;
+                            document.getElementById('topup-qr-panel').style.display = 'block';
+                            window.Swal.getHtmlContainer()?.querySelector('#topup-reference')?.replaceChildren(document.createTextNode(response.data.topup.Reference));
+                        } catch (error) {
+                            window.Swal.showValidationMessage(error.response?.data?.message || error.message || 'ไม่สามารถสร้างรายการชำระเงินได้');
+                        }
+                    };
+                    const render = async (amount) => {
+                        document.querySelectorAll('.topup-option').forEach(el => el.classList.toggle('selected', Number(el.dataset.amount) === amount));
+                        document.getElementById('qr-amount').textContent = amount.toLocaleString();
+                    };
+                    document.querySelectorAll('input[name="topup_amount"]').forEach(input => input.addEventListener('change', e => render(Number(e.target.value))));
+                    document.getElementById('create-topup-qr').onclick = () => {
+                        const selected = document.querySelector('input[name="topup_amount"]:checked');
+                        if (selected) createCharge(Number(selected.value));
+                    };
+                    document.getElementById('download-topup-qr').onclick = () => { const a = document.createElement('a'); a.href = document.getElementById('topup-qr').src; a.download = 'promptpay-topup.png'; a.click(); };
+                    render(100);
+                },
+                allowOutsideClick: true,
+                allowEscapeKey: true
+            });
+        }
+        ,
+        promptPayPayload(amount) {
+            const raw = String(import.meta.env.VITE_PROMPTPAY_ID || '').replace(/\D/g, '');
+            const id = raw.startsWith('0') ? `0066${raw.slice(1)}` : raw;
+            const merchant = `0016A00000067701011101${String(id.length).padStart(2, '0')}${id}`;
+            const value = Number(amount).toFixed(2);
+            const field = `0002010102122937${merchant}5802TH5303764` + `54${String(value.length).padStart(2, '0')}${value}6304`;
+            let crc = 0xffff; for (const ch of field) { crc ^= ch.charCodeAt(0) << 8; for (let i=0;i<8;i++) crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff; }
+            return field + crc.toString(16).toUpperCase().padStart(4, '0');
+        }
+    }
+}
+</script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap');
+
+.hide-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.hide-scroll {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.topup-option:has(input:checked) {
+    color: #15803d;
+    border-color: #16a34a !important;
+    background: #f0fdf4;
+}
+
+.topup-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.topup-option { min-height: 92px; border: 1px solid #cbd5e1; border-radius: 18px; padding: 12px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; background: #fff; }
+.topup-option input { display: none; }
+.topup-option strong { font-size: 20px; color: #111827; }
+.topup-option small { color: #a3a3a3; font-weight: 600; }
+.topup-option.selected, .topup-option:has(input:checked) { background: #05c968; border-color: #05c968 !important; color: #fff; }
+.topup-option.selected strong, .topup-option:has(input:checked) strong, .topup-option.selected small, .topup-option:has(input:checked) small { color: #fff; }
+.qr-panel { border: 1px solid #cbd5e1; border-radius: 24px; padding: 18px 10px 12px; text-align: center; }
+.qr-panel #topup-qr { display: block; margin: 0 auto; }
+</style>

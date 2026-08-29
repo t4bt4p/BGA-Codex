@@ -20,16 +20,17 @@ class BoardgameController extends Controller
     {
         $request->validate([
             'Bg_name' => 'required|string|max:255',
-            'Bg_cost' => 'required|string|max:255',
-            'Bg_min_player' => 'required|integer',
-            'Bg_max_player' => 'required|integer',
-            'Bg_playduration' => 'required|integer',
+            'Bg_cost' => 'required|integer|min:0',
+            'Bg_min_player' => 'required|integer|min:1',
+            'Bg_max_player' => 'required|integer|gte:Bg_min_player',
+            'Bg_playduration' => 'required|integer|min:1',
             'Bg_Catetogory_id' => 'required|exists:Boardgame_category_tb,Bg_category_id',
             'Bg_Image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048', // 👈 ตรวจสอบว่าเป็นไฟล์รูปภาพ ไม่เกิน 2MB
         ]);
 
         $data = $request->except('Bg_Image'); // ดึงข้อมูลทั้งหมดมาก่อน ยกเว้นรูป
         $data['Bg_use_status'] = 1;
+        $data['Bg_Image'] = '';
 
         // เช็คว่ามีการแนบไฟล์รูปมาไหม?
         if ($request->hasFile('Bg_Image')) {
@@ -77,10 +78,10 @@ class BoardgameController extends Controller
 
         $request->validate([
             'Bg_name' => 'required|string|max:255',
-            'Bg_cost' => 'required|string|max:255',
-            'Bg_min_player' => 'required|integer',
-            'Bg_max_player' => 'required|integer',
-            'Bg_playduration' => 'required|integer',
+            'Bg_cost' => 'required|integer|min:0',
+            'Bg_min_player' => 'required|integer|min:1',
+            'Bg_max_player' => 'required|integer|gte:Bg_min_player',
+            'Bg_playduration' => 'required|integer|min:1',
             'Bg_Catetogory_id' => 'required|exists:Boardgame_category_tb,Bg_category_id',
             'Bg_Image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);

@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'opn' => [
+        'public_key' => env('OPN_PUBLIC_KEY'),
+        'secret_key' => env('OPN_SECRET_KEY'),
+        'webhook_secret' => env('OPN_WEBHOOK_SECRET'),
+    ],
+
 ];

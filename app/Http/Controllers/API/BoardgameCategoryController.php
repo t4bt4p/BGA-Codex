@@ -19,7 +19,7 @@ class BoardgameCategoryController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'Bg_category_name' => 'required|string|max:255',
+            'Bg_category_name' => 'required|string|max:255|unique:Boardgame_category_tb,Bg_category_name',
         ]);
 
         $category = Boardgame_category_tb::create([

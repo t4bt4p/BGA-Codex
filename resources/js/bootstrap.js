@@ -16,9 +16,12 @@ const token = localStorage.getItem('admin_token');
 
 // 1. ก่อนที่ Axios จะยิง API ทุกครั้ง ให้มันหยิบ Token แปะไปด้วยอัตโนมัติ
 axios.interceptors.request.use(config => {
-    const currentToken = localStorage.getItem('admin_token');
-    if (currentToken) {
-        config.headers.Authorization = `Bearer ${currentToken}`;
+    // หาดูว่ามี token ของใครล็อกอินอยู่บ้าง
+    const token = window.location.pathname.startsWith('/admin')
+        ? localStorage.getItem('admin_token')
+        : localStorage.getItem('user_token');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
 });
@@ -29,6 +32,7 @@ axios.interceptors.response.use(
     error => {
         if (error.response && error.response.status === 401) {
             localStorage.removeItem('admin_token');
+            localStorage.removeItem('user_token');
             if (window.location.pathname !== '/login') {
                 window.location.href = '/login'; // บังคับรีไดเรกต์ไปหน้าล็อกอิน
             }

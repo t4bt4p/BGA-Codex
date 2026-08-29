@@ -138,7 +138,8 @@ export default {
                 console.error(error);
             } finally {
                 localStorage.removeItem('admin_token');
-                this.$router.push({ name: 'login' });
+                localStorage.removeItem('user_token');
+                this.$router.push({ name: 'admin.login' });
             }
         }
     }

@@ -11,9 +11,6 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // 📌 เพิ่มบรรทัดนี้: บังคับลบตารางเก่าทิ้งก่อนถ้ามีอยู่แล้ว
-        Schema::dropIfExists('Transaction_tb');
-
         // จากนั้นค่อยสร้างตารางใหม่
         Schema::create('Transaction_tb', function (Blueprint $table) {
             $table->increments('Ts_id');

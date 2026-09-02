@@ -11,6 +11,7 @@ import Swal from 'sweetalert2';
 window.Swal = Swal;
 
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+import './echo';
 // ดึง Token จาก localStorage
 const token = localStorage.getItem('admin_token');
 

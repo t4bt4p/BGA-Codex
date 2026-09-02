@@ -249,8 +249,22 @@ export default {
         
         this.boardgameModalInstance = new window.bootstrap.Modal(this.$refs.addBoardgameModal);
         this.categoryModalInstance = new window.bootstrap.Modal(this.$refs.categoryModal);
+        window.Echo.channel('boardgames')
+            .listen('.boardgame.status.changed', this.applyRealtimeStatus);
+    },
+    beforeUnmount() {
+        window.Echo.leave('boardgames');
     },
     methods: {
+        applyRealtimeStatus(event) {
+            const game = this.boardgames.find(item => Number(item.Bg_id) === Number(event.Bg_id));
+            if (!game) {
+                this.fetchBoardgames();
+                return;
+            }
+            game.Bg_use_status = Number(event.Bg_use_status);
+            game.updated_at = event.updated_at;
+        },
         async fetchBoardgames() {
             try {
                 const response = await window.axios.get('/api/boardgames');

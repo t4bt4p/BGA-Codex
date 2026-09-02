@@ -35,10 +35,15 @@
                         style="width: 42px; height: 42px;">
                         <i class="fa-solid fa-qrcode fs-5"></i>
                     </div>
-                    <div v-else-if="tx.T_type === 'เช่าเกม'"
+                    <div v-else-if="tx.T_type === 'rental_debit'"
                         class="rounded-circle bg-warning bg-opacity-10 d-flex align-items-center justify-content-center text-warning border border-warning border-opacity-25"
                         style="width: 42px; height: 42px;">
                         <i class="fa-solid fa-dice fs-5"></i>
+                    </div>
+                    <div v-else-if="tx.T_type === 'return_event'"
+                        class="rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center text-success border border-success border-opacity-25"
+                        style="width: 42px; height: 42px;">
+                        <i class="fa-solid fa-rotate-left fs-5"></i>
                     </div>
                     <div v-else
                         class="rounded-circle bg-danger bg-opacity-10 d-flex align-items-center justify-content-center text-danger border border-danger border-opacity-25"
@@ -49,7 +54,7 @@
                     <!-- รายละเอียด -->
                     <div>
                         <p class="fw-bold text-dark mb-0" style="font-size: 14px; line-height: 1.2;">
-                            {{ tx.T_type }} <span v-if="tx.boardgame"> {{ tx.boardgame.Bg_name }}</span>
+                            {{ typeLabel(tx.T_type) }} <span v-if="tx.boardgame"> {{ tx.boardgame.Bg_name }}</span>
                         </p>
                         <p class="text-muted mb-0" style="font-size: 10px; font-family: monospace;">
                             Tx: 0x{{ generateHash(tx.Ts_id) }} • {{ formatDate(tx.created_at) }}
@@ -62,8 +67,8 @@
                     <span v-if="tx.T_type === 'topup_credit'" class="fw-bold text-success" style="font-size: 15px;">
                         +{{ tx.T_cost }} <i class="fa-solid fa-coins text-warning" style="font-size: 11px;"></i>
                     </span>
-                    <span v-else-if="tx.T_type === 'คืนเกม'" class="fw-bold text-warning" style="font-size: 15px;">
-                      <i class="fa-solid fa-coins text-warning" style="font-size: 11px;"></i>
+                    <span v-else-if="tx.T_type === 'return_event'" class="fw-bold text-success" style="font-size: 13px;">
+                      คืนแล้ว
                     </span>
                     <span v-else class="fw-bold text-danger" style="font-size: 15px;">
                         -{{ tx.T_cost }} <i class="fa-solid fa-coins text-warning" style="font-size: 11px;"></i>
@@ -100,7 +105,7 @@ export default {
                 return this.transactions.filter(tx => tx.T_type === 'topup_credit');
             }
             if (this.filter === 'rent') {
-                return this.transactions.filter(tx => tx.T_type === 'เช่าเกม' || tx.T_type === 'คืนเกม');
+                return this.transactions.filter(tx => ['rental_debit', 'return_event', 'late_fee_debit'].includes(tx.T_type));
             }
             return this.transactions;
         }
@@ -124,6 +129,15 @@ export default {
             // สร้าง Hash จำลองสั้นๆ ให้ดูเท่เหมือน Blockchain
             const str = "0000" + id * 87654321;
             return str.substring(str.length - 6) + "...";
+        },
+        typeLabel(type) {
+            return {
+                topup_credit: 'เติมโทเคน',
+                rental_debit: 'เช่าเกม',
+                return_event: 'คืนเกม',
+                late_fee_debit: 'ค่าปรับคืนล่าช้า',
+                admin_debit: 'หักโทเคนโดยผู้ดูแล'
+            }[type] || type;
         }
     }
 }

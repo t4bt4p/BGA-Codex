@@ -2,7 +2,7 @@
     <div class="d-flex justify-content-center bg-dark" style="min-height: 100vh; font-family: 'Sarabun', sans-serif;">
         <!-- Mobile Container Wrapper -->
         <div class="bg-light position-relative d-flex flex-column shadow-lg overflow-hidden"
-            style="width: 100%; max-width: 430px; height: 100vh;">
+            style="width: 100%; max-width: 430px; height: 100dvh; min-height: 100svh;">
 
             <!-- Header (Top Bar) -->
             <header
@@ -120,6 +120,7 @@ export default {
         // สร้างคำขอเติมเงินและแสดง QR ตามยอดที่เลือก
         openTopupModal() {
             const amounts = [20, 50, 100, 500, 1000];
+            let topupPoller = null;
             window.Swal.fire({
                 title: 'เติมโทเค่น',
                 width: '390px',
@@ -157,6 +158,34 @@ export default {
                             qr.src = code.startsWith('data:') ? code : code;
                             document.getElementById('topup-qr-panel').style.display = 'block';
                             window.Swal.getHtmlContainer()?.querySelector('#topup-reference')?.replaceChildren(document.createTextNode(response.data.topup.Reference));
+
+                            const syncTopup = async () => {
+                                try {
+                                    const sync = await axios.post(`/api/topups/${response.data.topup.Topup_id}/sync`);
+                                    if (sync.data.status === 'approved') {
+                                        clearInterval(topupPoller);
+                                        topupPoller = null;
+                                        await this.fetchUserProfile();
+                                        window.Swal.fire({
+                                            icon: 'success',
+                                            title: 'เติมโทเคนสำเร็จ',
+                                            text: `เพิ่ม ${amount.toLocaleString()} โทเคนเข้ากระเป๋าแล้ว`,
+                                            timer: 2200,
+                                            showConfirmButton: false,
+                                        });
+                                        return true;
+                                    }
+                                } catch (error) {
+                                    console.warn('ยังไม่สามารถยืนยันรายการเติมเงินได้', error);
+                                }
+
+                                return false;
+                            };
+                            clearInterval(topupPoller);
+                            const approved = await syncTopup();
+                            if (!approved && !topupPoller) {
+                                topupPoller = setInterval(syncTopup, 3000);
+                            }
                         } catch (error) {
                             window.Swal.showValidationMessage(error.response?.data?.message || error.message || 'ไม่สามารถสร้างรายการชำระเงินได้');
                         }
@@ -172,6 +201,9 @@ export default {
                     };
                     document.getElementById('download-topup-qr').onclick = () => { const a = document.createElement('a'); a.href = document.getElementById('topup-qr').src; a.download = 'promptpay-topup.png'; a.click(); };
                     render(100);
+                },
+                willClose: () => {
+                    clearInterval(topupPoller);
                 },
                 allowOutsideClick: true,
                 allowEscapeKey: true
@@ -201,6 +233,9 @@ export default {
 .hide-scroll {
     -ms-overflow-style: none;
     scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
 }
 
 .topup-option:has(input:checked) {
@@ -210,7 +245,7 @@ export default {
 }
 
 .topup-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.topup-option { min-height: 92px; border: 1px solid #cbd5e1; border-radius: 18px; padding: 12px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; background: #fff; }
+.topup-option { min-height: 92px; border: 1px solid #cbd5e1; border-radius: 18px; padding: 12px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; background: #fff; touch-action: manipulation; user-select: none; -webkit-tap-highlight-color: transparent; }
 .topup-option input { display: none; }
 .topup-option strong { font-size: 20px; color: #111827; }
 .topup-option small { color: #a3a3a3; font-weight: 600; }

@@ -19,7 +19,7 @@
                             <tr>
                                 <th class="text-muted fw-bold py-3 px-4" style="width: 80px;">รหัส</th>
                                 <th class="text-muted fw-bold py-3">บอร์ดเกม</th>
-                                <th class="text-muted fw-bold py-3 text-center">ค่าเช่า</th>
+                                <th class="text-muted fw-bold py-3 text-center">ราคารวม</th>
                                 <th class="text-muted fw-bold py-3 text-center">สถานะ</th>
                                 <!-- 📌 คอลัมน์ใหม่: เวลาทำรายการล่าสุด -->
                                 <th class="text-muted fw-bold py-3 text-center">เวลาทำรายการล่าสุด</th>
@@ -40,7 +40,7 @@
                                     </div>
                                 </td>
                                 <td class="text-center text-success fw-bold">
-                                    {{ bg.Bg_cost }} บาท
+                                    {{ rentalTotal(bg).toLocaleString('th-TH') }}
                                 </td>
                                 
                                 <!-- 📌 สถานะ -->
@@ -90,6 +90,7 @@
                     </table>
                 </div>
             </div>
+
         </div>
     </AdminLayout>
 </template>
@@ -103,6 +104,7 @@ export default {
         return {
             boardgames: [],
             users: [],
+            rentals: [],
             searchQuery: ''
         };
     },
@@ -111,12 +113,33 @@ export default {
             return this.boardgames.filter(bg => {
                 return bg.Bg_name.toLowerCase().includes(this.searchQuery.toLowerCase());
             });
-        }
+        },
     },
     mounted() {
         this.fetchData();
+        window.Echo.channel('boardgames')
+            .listen('.boardgame.status.changed', this.applyRealtimeStatus);
+    },
+    beforeUnmount() {
+        window.Echo.leave('boardgames');
     },
     methods: {
+        rentalTotal(bg) {
+            const activeRental = this.rentals.find(rental =>
+                Number(rental.Bg_id) === Number(bg.Bg_id) && rental.Rental_status === 'active'
+            );
+            return Number(activeRental?.Rental_cost ?? bg.Bg_cost ?? 0);
+        },
+        applyRealtimeStatus(event) {
+            const game = this.boardgames.find(item => Number(item.Bg_id) === Number(event.Bg_id));
+            if (!game) {
+                this.fetchData();
+                return;
+            }
+            game.Bg_use_status = Number(event.Bg_use_status);
+            game.updated_at = event.updated_at;
+            this.fetchData();
+        },
         // ฟังก์ชันแปลงเวลาเป็นภาษาไทย
         formatThaiDate(dateString) {
             if (!dateString) return '-';
@@ -132,12 +155,14 @@ export default {
 
         async fetchData() {
             try {
-                const [bgRes, userRes] = await Promise.all([
+                const [bgRes, userRes, rentalRes] = await Promise.all([
                     window.axios.get('/api/boardgames'),
-                    window.axios.get('/api/users')
+                    window.axios.get('/api/users'),
+                    window.axios.get('/api/rentals')
                 ]);
                 this.boardgames = bgRes.data;
                 this.users = userRes.data.filter(u => u.User_status === 1);
+                this.rentals = rentalRes.data;
             } catch (error) {
                 console.error('โหลดข้อมูลผิดพลาด', error);
             }
@@ -145,15 +170,15 @@ export default {
 
         async processRent(bg) {
             const userOptions = this.users.map(u => 
-                `<option value="${u.User_id}">${u.User_name} (กระเป๋า: ${u.wallet ? u.wallet.Wallet_count : 0} บาท)</option>`
+                `<option value="${Number(u.User_id)}">${this.escapeHtml(u.User_name)} (กระเป๋า: ${Number(u.wallet?.Wallet_count || 0)} บาท)</option>`
             ).join('');
 
             const { value: selectedUserId } = await window.Swal.fire({
                 title: 'ทำรายการเช่าบอร์ดเกม',
                 html: `
                     <div class="text-start mb-3 p-3 bg-light rounded-3">
-                        <div>เกม: <strong>${bg.Bg_name}</strong></div>
-                        <div class="text-danger mt-1">ค่าเช่าที่จะหัก: <strong>${bg.Bg_cost} บาท</strong></div>
+                        <div>เกม: <strong>${this.escapeHtml(bg.Bg_name)}</strong></div>
+                        <div class="text-danger mt-1">ค่าเช่าที่จะหัก: <strong>${Number(bg.Bg_cost)} บาท</strong></div>
                     </div>
                     <div class="text-start">
                         <label class="form-label fw-bold small text-muted">เลือกลูกค้าที่ทำรายการ</label>
@@ -161,27 +186,42 @@ export default {
                             <option value="">-- กรุณาเลือกลูกค้า --</option>
                             ${userOptions}
                         </select>
+                        <label class="form-label fw-bold small text-muted mt-3">จำนวนวันที่เช่า (1–7 วัน)</label>
+                        <input id="swal-rental-days" type="number" class="form-control bga-input" value="1" min="1" max="7">
+                        <div class="small text-success mt-2">ยอดรวม: <strong id="swal-rental-total">${Number(bg.Bg_cost)}</strong> โทเคน</div>
                     </div>
                 `,
                 focusConfirm: false,
                 showCancelButton: true,
                 confirmButtonText: 'ยืนยันการเช่า',
                 cancelButtonText: 'ยกเลิก',
+                didOpen: () => {
+                    document.getElementById('swal-rental-days').addEventListener('input', event => {
+                        const days = Math.min(7, Math.max(1, Number(event.target.value) || 1));
+                        document.getElementById('swal-rental-total').textContent = (Number(bg.Bg_cost) * days).toLocaleString();
+                    });
+                },
                 preConfirm: () => {
                     const userId = document.getElementById('swal-user-select').value;
+                    const rentalDays = Number(document.getElementById('swal-rental-days').value);
                     if (!userId) {
                         window.Swal.showValidationMessage('กรุณาเลือกลูกค้า');
                         return false;
                     }
-                    return userId;
+                    if (!Number.isInteger(rentalDays) || rentalDays < 1 || rentalDays > 7) {
+                        window.Swal.showValidationMessage('จำนวนวันต้องอยู่ระหว่าง 1–7 วัน');
+                        return false;
+                    }
+                    return { userId, rentalDays };
                 }
             });
 
             if (selectedUserId) {
                 try {
                     await window.axios.post('/api/rentals/rent', {
-                        User_id: selectedUserId,
-                        Bg_id: bg.Bg_id
+                        User_id: selectedUserId.userId,
+                        Bg_id: bg.Bg_id,
+                        rental_days: selectedUserId.rentalDays,
                     });
                     
                     window.Swal.fire({ icon: 'success', title: 'เช่าสำเร็จ!', timer: 1500, showConfirmButton: false });
@@ -192,14 +232,20 @@ export default {
             }
         },
 
+        escapeHtml(value) {
+            const element = document.createElement('div');
+            element.textContent = String(value ?? '');
+            return element.innerHTML;
+        },
+
         async processReturn(bg) {
-            const userOptions = this.users.map(u => `<option value="${u.User_id}">${u.User_name}</option>`).join('');
+            const userOptions = this.users.map(u => `<option value="${Number(u.User_id)}">${this.escapeHtml(u.User_name)}</option>`).join('');
 
             const { value: returnData } = await window.Swal.fire({
                 title: 'รับคืนบอร์ดเกม',
                 html: `
                     <div class="text-start mb-3 p-3 bg-light rounded-3">
-                        <div>เกมที่รับคืน: <strong>${bg.Bg_name}</strong></div>
+                        <div>เกมที่รับคืน: <strong>${this.escapeHtml(bg.Bg_name)}</strong></div>
                     </div>
                     <div class="text-start mb-3">
                         <label class="form-label fw-bold small text-muted">เลือกลูกค้าที่นำมาคืน</label>
@@ -208,10 +254,7 @@ export default {
                             ${userOptions}
                         </select>
                     </div>
-                    <div class="text-start">
-                        <label class="form-label fw-bold small text-muted">ค่าปรับ (บาท) *ใส่ 0 ถ้าไม่มี</label>
-                        <input type="number" id="swal-late-fee" class="form-control bga-input" value="0" min="0">
-                    </div>
+                    <div class="alert alert-warning small mb-0">ระบบจะคำนวณค่าปรับอัตโนมัติวันละ 100% ของราคาเช่า และตรวจยอด Wallet ก่อนรับคืน</div>
                 `,
                 focusConfirm: false,
                 showCancelButton: true,
@@ -220,13 +263,12 @@ export default {
                 cancelButtonText: 'ยกเลิก',
                 preConfirm: () => {
                     const userId = document.getElementById('swal-return-user').value;
-                    const lateFee = document.getElementById('swal-late-fee').value;
                     
                     if (!userId) {
                         window.Swal.showValidationMessage('กรุณาเลือกลูกค้า');
                         return false;
                     }
-                    return { User_id: userId, late_fee: lateFee };
+                    return { User_id: userId };
                 }
             });
 
@@ -234,8 +276,7 @@ export default {
                 try {
                     await window.axios.post('/api/rentals/return', {
                         User_id: returnData.User_id,
-                        Bg_id: bg.Bg_id,
-                        late_fee: returnData.late_fee
+                        Bg_id: bg.Bg_id
                     });
                     
                     window.Swal.fire({ icon: 'success', title: 'รับคืนสำเร็จ!', timer: 1500, showConfirmButton: false });

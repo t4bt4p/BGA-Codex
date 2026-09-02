@@ -41,4 +41,20 @@ return [
         'webhook_secret' => env('OPN_WEBHOOK_SECRET'),
     ],
 
+    'polygon' => [
+        'enabled' => env('POLYGON_ENABLED', false),
+        'network' => env('POLYGON_NETWORK', 'polygon-amoy'),
+        'chain_id' => (int) env('POLYGON_CHAIN_ID', 80002),
+        'rpc_url' => env('POLYGON_RPC_URL', 'https://polygon-amoy.drpc.org'),
+        'private_key' => env('POLYGON_PRIVATE_KEY'),
+        'encrypted_wallet_path' => env('POLYGON_ENCRYPTED_WALLET_PATH', 'polygon/wallet.key'),
+        'wallet_address_path' => env('POLYGON_WALLET_ADDRESS_PATH', 'polygon/address.txt'),
+        'contract_address' => env('POLYGON_CONTRACT_ADDRESS'),
+        'contract_info_path' => env('POLYGON_CONTRACT_INFO_PATH', 'polygon/contract.json'),
+        'confirmations' => (int) env('POLYGON_CONFIRMATIONS', 1),
+        'priority_fee_gwei' => env('POLYGON_PRIORITY_FEE_GWEI', 25),
+        'max_fee_gwei' => env('POLYGON_MAX_FEE_GWEI', 35),
+        'explorer_url' => env('POLYGON_EXPLORER_URL', 'https://amoy.polygonscan.com'),
+    ],
+
 ];

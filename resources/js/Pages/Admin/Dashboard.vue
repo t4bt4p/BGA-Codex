@@ -4,6 +4,27 @@
         <template #header>แดชบอร์ดสรุปผล (Dashboard)</template>
         
         <div class="fade-in-section">
+            <div class="card bga-card p-3 mb-4">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted">รูปแบบรายงาน</label>
+                        <select v-model="filterMode" class="form-select" @change="fetchReport">
+                            <option value="month">รายเดือน</option>
+                            <option value="range">กำหนดช่วงวันที่</option>
+                        </select>
+                    </div>
+                    <div v-if="filterMode === 'month'" class="col-md-4">
+                        <label class="form-label small fw-bold text-muted">เดือน</label>
+                        <input v-model="selectedMonth" type="month" class="form-control" @change="fetchReport">
+                    </div>
+                    <template v-else>
+                        <div class="col-md-3"><label class="form-label small fw-bold text-muted">ตั้งแต่วันที่</label><input v-model="dateFrom" type="date" class="form-control"></div>
+                        <div class="col-md-3"><label class="form-label small fw-bold text-muted">ถึงวันที่</label><input v-model="dateTo" type="date" class="form-control"></div>
+                        <div class="col-md-2"><button class="btn btn-success w-100" :disabled="loading" @click="fetchReport">แสดงรายงาน</button></div>
+                    </template>
+                    <div class="col text-md-end"><span class="badge text-bg-light border px-3 py-2">{{ report.period.label }}</span></div>
+                </div>
+            </div>
             <!-- KPI Cards Row -->
             <div class="row g-4 mb-4">
                 
@@ -12,10 +33,10 @@
                     <div class="card bga-card h-100">
                         <div class="card-body p-4 d-flex align-items-center justify-content-between">
                             <div>
-                                <p class="kpi-label mb-1">ยอดเช่าวันนี้</p>
+                                <p class="kpi-label mb-1">จำนวนเช่าในช่วงที่เลือก</p>
                                 <div class="d-flex align-items-end gap-2">
-                        <h2 class="kpi-value mb-0 text-dark">{{ report.rentals_today }}</h2>
-                                    <span class="kpi-trend text-success mb-1 d-flex align-items-center">วันนี้
+                        <h2 class="kpi-value mb-0 text-dark">{{ report.period_rentals }}</h2>
+                                    <span class="kpi-trend text-success mb-1 d-flex align-items-center">รายการ
                                     </span>
                                 </div>
                             </div>
@@ -31,9 +52,9 @@
                     <div class="card bga-card h-100">
                         <div class="card-body p-4 d-flex align-items-center justify-content-between">
                             <div>
-                                <p class="kpi-label mb-1">รายได้โทเคนเดือนนี้</p>
+                                <p class="kpi-label mb-1">รายได้ในช่วงที่เลือก</p>
                                 <div class="d-flex align-items-end gap-2">
-                                    <h2 class="kpi-value mb-0" style="color: #16a34a;">{{ report.revenue_month.toLocaleString() }}</h2>
+                                    <h2 class="kpi-value mb-0" style="color: #16a34a;">{{ report.period_revenue.toLocaleString() }}</h2>
                                     <i class="fa-solid fa-coins text-warning mb-2" style="font-size: 14px;"></i>
                                 </div>
                             </div>
@@ -84,10 +105,10 @@
             
             <!-- พื้นที่สำหรับกราฟและตาราง (เตรียมไว้สำหรับสเต็ปถัดไป) -->
             <div class="card bga-card p-4 mt-4">
-                <div class="d-flex justify-content-between align-items-center mb-3"><h5 class="fw-bold mb-0">ยอดเช่ารายวัน</h5><span class="text-muted small">ย้อนหลัง 7 วัน</span></div>
-                <div class="chart-wrap" v-if="report.daily_rentals.length">
+                <div class="d-flex justify-content-between align-items-center mb-3"><h5 class="fw-bold mb-0">ยอดเช่ารายวัน</h5><span class="text-muted small">{{ report.period.label }}</span></div>
+                <div class="chart-scroll" v-if="report.daily_rentals.length"><div class="chart-wrap" :style="{ minWidth: Math.max(640, report.daily_rentals.length * 42) + 'px' }">
                     <div v-for="day in report.daily_rentals" :key="day.label" class="chart-col"><span class="chart-value">{{ day.count }}</span><div class="chart-bar" :style="{height: barHeight(day.count) + '%'}"></div><small>{{ day.label }}</small></div>
-                </div>
+                </div></div>
             </div>
             <div class="card bga-card p-4 mt-4">
                 <h5 class="fw-bold mb-3">เกมยอดนิยม</h5>
@@ -104,13 +125,56 @@
 <script>
 import AdminLayout from '../../Layouts/AdminLayout.vue';
 
+const localDate = date => {
+    const offset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+};
+
 export default {
     components: {
         AdminLayout
     },
-    data() { return { report: { rentals_today: 0, revenue_month: 0, active_rentals: 0, overdue_rentals: 0, popular_games: [], daily_rentals: [] } }; },
-    mounted() { this.fetchReport(); },
-    methods: { async fetchReport() { try { const response = await window.axios.get('/api/reports/dashboard'); this.report = response.data; } catch (error) { console.error('โหลดรายงานไม่สำเร็จ', error); } }, barHeight(value) { const max=Math.max(...this.report.daily_rentals.map(item=>item.count),1); return Math.max((value/max)*100, value ? 8 : 2); } }
+    data() {
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        return {
+            loading: false,
+            filterMode: 'month',
+            selectedMonth: localDate(today).slice(0, 7),
+            dateFrom: localDate(firstDay),
+            dateTo: localDate(today),
+            report: { period: { label: '-' }, period_rentals: 0, period_revenue: 0, rentals_today: 0, active_rentals: 0, overdue_rentals: 0, popular_games: [], daily_rentals: [] },
+            realtimeTimer: null,
+        };
+    },
+    mounted() {
+        this.fetchReport();
+        window.Echo.channel('boardgames')
+            .listen('.boardgame.status.changed', this.refreshRealtimeReport);
+    },
+    beforeUnmount() {
+        clearTimeout(this.realtimeTimer);
+        window.Echo.leave('boardgames');
+    },
+    methods: {
+        refreshRealtimeReport() {
+            clearTimeout(this.realtimeTimer);
+            this.realtimeTimer = setTimeout(() => this.fetchReport(), 150);
+        },
+        async fetchReport() {
+            this.loading = true;
+            const params = this.filterMode === 'month' ? { month: this.selectedMonth } : { from: this.dateFrom, to: this.dateTo };
+            try {
+                const response = await window.axios.get('/api/reports/dashboard', { params });
+                this.report = response.data;
+            } catch (error) {
+                window.Swal.fire({ icon: 'error', title: 'โหลดรายงานไม่สำเร็จ', text: error.response?.data?.message || 'กรุณาตรวจสอบช่วงวันที่' });
+            } finally {
+                this.loading = false;
+            }
+        },
+        barHeight(value) { const max=Math.max(...this.report.daily_rentals.map(item=>item.count),1); return Math.max((value/max)*100, value ? 8 : 2); }
+    }
 }
 </script>
 
@@ -144,6 +208,7 @@ export default {
     font-weight: 700;
 }
 .chart-wrap { height: 220px; display:flex; align-items:flex-end; gap:clamp(8px,3vw,28px); padding:20px 12px 0; border-bottom:1px solid #e2e8f0; }
+.chart-scroll { overflow-x: auto; }
 .chart-col { flex:1; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:7px; color:#64748b; font-size:11px; }
 .chart-bar { width:min(42px,70%); min-height:4px; border-radius:8px 8px 0 0; background:linear-gradient(180deg,#22c55e,#15803d); transition:height .4s ease; }
 .chart-value { font-weight:700; color:#15803d; min-height:16px; }

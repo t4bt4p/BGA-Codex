@@ -114,7 +114,7 @@ const router = createRouter({
 // ==========================================
 // 🛑 Route Guard (ยามเฝ้าประตูระดับสูง)
 // ==========================================
-router.beforeEach((to, from, next) => {
+router.beforeEach((to) => {
     const isAdminRoute = to.path.startsWith('/admin');
     const isAdminAuthenticated = localStorage.getItem('admin_token');
     const isUserAuthenticated = localStorage.getItem('user_token');
@@ -123,12 +123,12 @@ router.beforeEach((to, from, next) => {
     if (isAdminRoute) {
         if (to.name !== 'admin.login' && !isAdminAuthenticated) {
             // ถ้าไม่ใช่หน้าล็อกอิน และยังไม่ได้ล็อกอินแอดมิน -> เด้งไปหน้าล็อกอินแอดมิน
-            next({ name: 'admin.login' });
+            return { name: 'admin.login' };
         } else if (to.name === 'admin.login' && isAdminAuthenticated) {
             // ถ้าล็อกอินแล้ว จะเข้าหน้าล็อกอินอีกทำไม -> เด้งไป Dashboard เลย
-            next({ name: 'admin.dashboard' });
+            return { name: 'admin.dashboard' };
         } else {
-            next(); // ผ่านได้
+            return true;
         }
     } 
     // 🚪 2. ตรวจสอบการเข้าถึงฝั่งลูกค้า (User)
@@ -138,12 +138,12 @@ router.beforeEach((to, from, next) => {
         
         if (protectedUserRoutes.includes(to.name) && !isUserAuthenticated) {
             // ถ้าจะเข้าหน้าที่มีการป้องกัน แต่ยังไม่มี Token -> เด้งไปหน้าล็อกอิน
-            next({ name: 'user.login' });
+            return { name: 'user.login' };
         } else if ((to.name === 'user.login' || to.name === 'user.register') && isUserAuthenticated) {
             // ถ้าล็อกอินแล้ว จะกลับมาหน้า Login/Register อีก -> เด้งไปหน้า Home เลย
-            next({ name: 'user.home' });
+            return { name: 'user.home' };
         } else {
-            next(); // ผ่านได้
+            return true;
         }
     }
 });

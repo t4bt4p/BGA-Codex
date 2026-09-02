@@ -19,24 +19,27 @@
                     <div class="flex-grow-1 pt-1">
                         <div class="d-flex justify-content-between align-items-start mb-1">
                             <h6 class="fw-bold text-dark mb-0" style="font-size: 15px;">{{ rent.boardgame?.Bg_name || 'ชื่อเกม' }}</h6>
-                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1" style="font-size: 9px;">
-                                สถานะปกติ
+                            <span class="badge px-2 py-1 border" :class="rent.is_overdue ? 'bg-danger bg-opacity-10 text-danger border-danger border-opacity-25' : 'bg-success bg-opacity-10 text-success border-success border-opacity-25'" style="font-size: 9px;">
+                                {{ rent.is_overdue ? `เกินกำหนด ${rent.overdue_days} วัน` : 'สถานะปกติ' }}
                             </span>
                         </div>
-                        <p class="text-muted mb-2" style="font-size: 11px;">วันที่เช่า: {{ formatDate(rent.created_at) }}</p>
+                        <p class="text-muted mb-1" style="font-size: 11px;">วันที่เช่า: {{ formatDate(rent.rented_at) }}</p>
+                        <p class="text-muted mb-2" style="font-size: 11px;">กำหนดคืน: {{ formatDateTime(rent.due_at) }} ({{ rent.rental_days }} วัน)</p>
                         
                         <div class="bg-light px-2 py-1.5 rounded-3 border d-inline-block">
-                            <span class="fw-bold text-secondary" style="font-size: 11px;">
-                                <i class="fa-solid fa-clock text-success me-1"></i> กำลังเช่าอยู่
+                            <span class="fw-bold" :class="rent.is_overdue ? 'text-danger' : 'text-secondary'" style="font-size: 11px;">
+                                <i class="fa-solid fa-clock me-1" :class="rent.is_overdue ? 'text-danger' : 'text-success'"></i>
+                                {{ rent.is_overdue ? `ค่าปรับสะสม ${rent.accrued_late_fee} โทเคน` : `กำหนดคืน ${formatDate(rent.due_at)}` }}
                             </span>
                         </div>
                     </div>
                 </div>
 
                 <!-- ปุ่มคืนเกม (จะยิงไปหา Controller คุณ) -->
-                <button @click="returnGame(rent)" class="btn btn-outline-success w-100 fw-bold rounded-3 py-2 d-flex justify-content-center align-items-center gap-2 transition-transform" style="font-size: 14px; border-width: 2px;">
+                <button @click="returnGame(rent)" :disabled="!canAffordFine(rent)" class="btn w-100 fw-bold rounded-3 py-2 d-flex justify-content-center align-items-center gap-2 transition-transform" :class="canAffordFine(rent) ? 'btn-outline-success' : 'btn-outline-danger'" style="font-size: 14px; border-width: 2px;">
                     <i class="fa-solid fa-box-open"></i> คืนบอร์ดเกม
                 </button>
+                <small v-if="!canAffordFine(rent)" class="text-danger text-center fw-bold">ยอดโทเคนไม่พอชำระค่าปรับ กรุณาเติมโทเคนก่อนคืน</small>
             </div>
 
             <!-- กรณีคืนเกมหมดแล้ว หรือยังไม่ได้เช่า -->
@@ -84,10 +87,23 @@ export default {
             const date = new Date(dateString);
             return date.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
         },
+        formatDateTime(dateString) {
+            if (!dateString) return '-';
+            return new Date(dateString).toLocaleString('th-TH', {
+                year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            });
+        },
+        canAffordFine(rent) {
+            return Number(this.userProfile?.wallet?.Wallet_count || 0) >= Number(rent.accrued_late_fee || 0);
+        },
         returnGame(rent) {
+            if (!this.canAffordFine(rent)) return;
+            const feeText = Number(rent.accrued_late_fee || 0) > 0
+                ? `ระบบจะหักค่าปรับ ${Number(rent.accrued_late_fee).toLocaleString()} โทเคน`
+                : 'รายการนี้ไม่มีค่าปรับ';
             window.Swal.fire({
                 title: 'คืนบอร์ดเกม?',
-                text: `คุณต้องการส่งคืนเกม ${rent.boardgame?.Bg_name} ใช่หรือไม่?`,
+                text: `คืนเกม ${rent.boardgame?.Bg_name}: ${feeText}`,
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonColor: '#16a34a',
@@ -99,8 +115,7 @@ export default {
                     try {
                         // 🚀 ยิง API พร้อม Payload ที่ Controller ของคุณต้องการ
                         const response = await axios.post(`/api/rentals/return`, {
-                            rental_id: rent.Rental_id,
-                            late_fee: 0 // สมมติว่ายังไม่มีค่าปรับ
+                            rental_id: rent.Rental_id
                         });
                         return response.data;
                     } catch (error) {
@@ -120,6 +135,7 @@ export default {
                         timer: 2000 
                     });
                     this.fetchMyRentals(); // โหลดรายการเกมใหม่ (เกมที่คืนจะหายไปจากหน้านี้)
+                    this.$emit('refresh-wallet');
                 }
             });
         }

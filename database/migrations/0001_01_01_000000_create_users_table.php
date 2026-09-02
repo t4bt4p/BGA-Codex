@@ -15,7 +15,7 @@ return new class extends Migration
             $table->increments('User_id'); // INT PK
             $table->string('User_username', 255)->unique(); // เพิ่ม ->unique() ให้กับ Username เพื่อไม่ให้สมัครซ้ำ
             $table->string('User_password', 255);
-            $table->char('User_phone', 10);
+            $table->string('User_phone', 15)->nullable();
             $table->string('User_name', 255);
 
             // --- ส่วนที่ปรับปรุง ---

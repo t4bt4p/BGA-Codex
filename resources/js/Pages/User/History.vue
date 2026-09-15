@@ -105,7 +105,7 @@ export default {
                 return this.transactions.filter(tx => tx.T_type === 'topup_credit');
             }
             if (this.filter === 'rent') {
-                return this.transactions.filter(tx => ['rental_debit', 'return_event', 'late_fee_debit'].includes(tx.T_type));
+                return this.transactions.filter(tx => ['rental_debit', 'return_event'].includes(tx.T_type));
             }
             return this.transactions;
         }
@@ -135,7 +135,6 @@ export default {
                 topup_credit: 'เติมโทเคน',
                 rental_debit: 'เช่าเกม',
                 return_event: 'คืนเกม',
-                late_fee_debit: 'ค่าปรับคืนล่าช้า',
                 admin_debit: 'หักโทเคนโดยผู้ดูแล'
             }[type] || type;
         }

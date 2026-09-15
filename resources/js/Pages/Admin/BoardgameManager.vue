@@ -69,8 +69,8 @@
                                     {{ game.Bg_cost }} บาท
                                 </div>
                                 <div class="d-flex gap-2">
-                                    <!-- 📌 ปุ่มแก้ไข: กดได้ตลอดเวลา -->
-                                    <button @click="openEditModal(game)" class="btn btn-sm btn-secondary shadow-sm px-3 fw-bold">
+                                    <!-- แก้ไขได้เมื่อเกมว่าง -->
+                                    <button @click="openEditModal(game)" :disabled="Number(game.Bg_use_status) === 0" class="btn btn-sm btn-secondary shadow-sm px-3 fw-bold">
                                         แก้ไข
                                     </button>
                                     <!-- 📌 ปุ่มลบ: จะถูกปิดใช้งาน (disabled) เมื่อเกมถูกเช่าอยู่ -->
@@ -307,6 +307,7 @@ export default {
         },
 
         openEditModal(game) {
+            if (Number(game.Bg_use_status) === 0) return;
             this.isEditMode = true;
             this.editId = game.Bg_id;
             
@@ -415,10 +416,10 @@ export default {
             if (result.isConfirmed) {
                 try {
                     await window.axios.delete(`/api/boardgames/${id}`);
-                    window.Swal.fire({ icon: 'success', title: 'ลบข้อมูลสำเร็จ!', showConfirmButton: false, timer: 1500 });
+                    window.Swal.fire({ icon: 'success', title: 'ลบข้อมูลสำเร็จ!', text: 'เกมถูกนำออกจากรายการแล้ว', showConfirmButton: false, timer: 1500 });
                     await this.fetchBoardgames(); 
                 } catch (error) {
-                    window.Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด!', text: 'ไม่สามารถลบข้อมูลบอร์ดเกมได้' });
+                    window.Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด!', text: error.response?.data?.message || 'ไม่สามารถลบข้อมูลบอร์ดเกมได้' });
                 }
             }
         }

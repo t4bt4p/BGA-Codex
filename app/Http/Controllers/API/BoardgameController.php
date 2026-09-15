@@ -70,12 +70,14 @@ class BoardgameController extends Controller
     // 4. แก้ไขข้อมูลบอร์ดเกม
     public function update(Request $request, $id)
     {
-        $boardgame = Boardgame_tb::find($id);
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $id) {
+        $boardgame = Boardgame_tb::lockForUpdate()->find($id);
 
         if (!$boardgame) {
             return response()->json(['message' => 'ไม่พบบอร์ดเกม'], 404);
         }
 
+        abort_if((int) $boardgame->Bg_use_status === 0 || \App\Models\Rental_tb::where('Bg_id', $id)->where('Rental_status', 'active')->exists(), 409, 'ไม่สามารถแก้ไขเกมที่กำลังถูกเช่าอยู่ กรุณารับคืนก่อน');
         $request->validate([
             'Bg_name' => 'required|string|max:255',
             'Bg_cost' => 'required|integer|min:0',
@@ -86,7 +88,7 @@ class BoardgameController extends Controller
             'Bg_Image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
-        $data = $request->except('Bg_Image');
+        $data = $request->only(['Bg_name', 'Bg_cost', 'Bg_min_player', 'Bg_max_player', 'Bg_playduration', 'Bg_Catetogory_id']);
 
         // ถ้ามีการอัปโหลดรูปภาพ "ใหม่" เข้ามาตอนแก้ไข
         if ($request->hasFile('Bg_Image')) {
@@ -102,5 +104,6 @@ class BoardgameController extends Controller
             'message' => 'แก้ไขข้อมูลสำเร็จ',
             'data' => $boardgame
         ]);
+        });
     }
 }

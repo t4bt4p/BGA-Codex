@@ -24,11 +24,12 @@ class AnchorTransactionOnPolygon implements ShouldQueue
     public function handle(PolygonAnchorService $polygon): void
     {
         $transaction = Transaction_tb::findOrFail($this->transactionId);
-        if ($transaction->Chain_status === 'confirmed') {
+        // The on-chain digest is always the exact hash of this transaction's private block.
+        $digest = $polygon->digest($transaction);
+        if ($transaction->Chain_status === 'confirmed' && $transaction->Chain_payload_hash === $digest) {
             return;
         }
 
-        $digest = $transaction->Chain_payload_hash ?: $polygon->digest($transaction);
         $transaction->update([
             'Chain_network' => config('services.polygon.network'),
             'Chain_payload_hash' => $digest,
@@ -49,7 +50,6 @@ class AnchorTransactionOnPolygon implements ShouldQueue
                 'Chain_status' => 'failed',
                 'Chain_error' => mb_substr($error->getMessage(), 0, 2000),
             ]);
-
             throw $error;
         }
     }

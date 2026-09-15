@@ -14,7 +14,7 @@ use App\Http\Middleware\MobileOnly;
 |
 */
 
-// 🎯 ครอบ Route หลักด้วย Middleware ให้ใช้งานได้เฉพาะบนมือถือเท่านั้น
+// Keep the mobile restriction available; USER_MOBILE_ONLY controls whether it is active.
 Route::middleware([MobileOnly::class])->group(function () {
     
     // เส้นทางสำหรับโหลดหน้าแอปพลิเคชัน Vue.js ทั้งหมด (SPA)

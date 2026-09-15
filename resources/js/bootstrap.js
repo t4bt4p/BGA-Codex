@@ -31,7 +31,16 @@ axios.interceptors.request.use(config => {
 axios.interceptors.response.use(
     response => response,
     error => {
-        if (error.response && error.response.status === 401) {
+        if (error.response?.data?.code === 'account_suspended' && !window.accountSuspensionShown) {
+            window.accountSuspensionShown = true;
+            const isAdmin = window.location.pathname.startsWith('/admin');
+            localStorage.removeItem(isAdmin ? 'admin_token' : 'user_token');
+            const reason = error.response.data.reason === 'overdue' ? 'overdue' : 'disabled';
+            sessionStorage.setItem('account_suspension', JSON.stringify({ reason, isAdmin }));
+            Swal.close();
+            window.location.replace(isAdmin ? '/admin/account-suspended' : '/account-suspended');
+        }
+        if (error.response && error.response.status === 401 && !window.accountSuspensionShown) {
             localStorage.removeItem('admin_token');
             localStorage.removeItem('user_token');
             if (window.location.pathname !== '/login') {

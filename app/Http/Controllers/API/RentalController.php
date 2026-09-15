@@ -9,7 +9,6 @@ use App\Models\Rental_tb;
 use App\Models\Topup_request_tb;
 use App\Models\Transaction_tb;
 use App\Models\User;
-use App\Services\BlockchainService;
 use App\Services\TopupSettlementService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,8 +17,6 @@ use Illuminate\Support\Str;
 
 class RentalController extends Controller
 {
-    public function __construct(protected BlockchainService $blockchain) {}
-
     public function rentGame(Request $r)
     {
         $r->validate([
@@ -31,6 +28,9 @@ class RentalController extends Controller
         if ($u->User_role === 'admin' && $r->filled('User_id')) {
             $u = User::with('wallet')->findOrFail($r->User_id);
         }
+
+        app(\App\Services\OverdueAccountService::class)->suspendIfOverdue($u);
+        abort_if((int) $u->User_status !== 1, 403, 'บัญชีนี้ถูกระงับ ไม่สามารถเช่าบอร์ดเกมได้');
 
         return DB::transaction(function () use ($r, $u) {
             $g = Boardgame_tb::lockForUpdate()->findOrFail($r->Bg_id);
@@ -83,24 +83,20 @@ class RentalController extends Controller
             if ($rent->Rental_status !== 'active') {
                 abort(409, 'รายการนี้ถูกคืนแล้ว');
             }
-            // ค่าปรับต่อวันเท่ากับ 100% ของราคาเช่าตอนเริ่มรายการ เศษวันนับเป็นหนึ่งวัน
-            $fee = $rent->calculateLateFee(now());
             $u = User::findOrFail($rent->User_id);
-            $wallet = $u->wallet()->lockForUpdate()->firstOrFail();
-            $b = (int) $wallet->Wallet_count;
-            if ($fee > $b) {
-                abort(422, "ยอดโทเคนไม่เพียงพอสำหรับค่าปรับ {$fee} โทเคน");
-            }
-            $rent->update(['returned_at' => now(), 'late_fee' => $fee, 'Rental_status' => 'returned']);
+            $isAdminForceReturn = $actor->User_role === 'admin';
+            $rent->forceFill([
+                'returned_at' => now(), 'Rental_status' => 'returned',
+                'returned_by_user_id' => $actor->User_id,
+                'returned_by_name' => $actor->User_role === 'admin' ? 'Admin' : $actor->User_name,
+            ])->save();
             $rent->boardgame->update(['Bg_use_status' => 1]);
             DB::afterCommit(fn () => BoardgameStatusChanged::dispatch($rent->boardgame->fresh()));
             $this->record($u, $rent->boardgame, 0, 'return_event', ['rental_id' => $rent->Rental_id]);
-            if ($fee) {
-                $this->record($u, $rent->boardgame, $fee, 'late_fee_debit', ['rental_id' => $rent->Rental_id]);
-                $wallet->update(['Wallet_count' => $b - $fee]);
-            }
 
-            return ['late_fee' => $fee, 'balance' => $b - $fee];
+            return [
+                'forced_by_admin' => $isAdminForceReturn,
+            ];
         });
 
         return response()->json(['status' => 'success'] + $result);
@@ -122,7 +118,10 @@ class RentalController extends Controller
         abort_unless(config('services.opn.secret_key'), 503, 'ยังไม่ได้ตั้งค่า Opn secret key');
         $reference = strtoupper(Str::random(12));
         $topup = Topup_request_tb::create(['User_id' => $r->user()->User_id, 'Amount' => $r->amount, 'Reference' => $reference]);
-        $charge = Http::withBasicAuth(config('services.opn.secret_key'), '')->asForm()->post('https://api.omise.co/charges', [
+        $charge = Http::withBasicAuth(config('services.opn.secret_key'), '')
+            ->connectTimeout(5)
+            ->timeout(20)
+            ->asForm()->post('https://api.omise.co/charges', [
             'amount' => (int) $r->amount * 100,
             'currency' => 'THB',
             'source[type]' => 'promptpay',
@@ -137,10 +136,19 @@ class RentalController extends Controller
         $topup->update(['Provider_charge_id' => $data['id'] ?? null]);
         $downloadUri = $data['source']['scannable_code']['image']['download_uri'] ?? null;
         if ($downloadUri) {
-            $image = Http::withBasicAuth(config('services.opn.secret_key'), '')->get($downloadUri);
+            // QR image retrieval must not leave the charge request hanging forever.
+            $image = Http::withBasicAuth(config('services.opn.secret_key'), '')
+                ->connectTimeout(1)
+                ->timeout(2)
+                ->get($downloadUri);
             if ($image->successful()) {
                 $data['qr_data'] = 'data:'.($image->header('Content-Type') ?: 'image/png').';base64,'.base64_encode($image->body());
+            } else {
+                // The provider URL is already a usable QR image fallback.
+                $data['qr_data'] = $downloadUri;
             }
+        } elseif (! empty($data['source']['scannable_code']['image']['download_uri'])) {
+            $data['qr_data'] = $data['source']['scannable_code']['image']['download_uri'];
         }
 
         return response()->json(['status' => 'success', 'topup' => $topup->fresh(), 'charge' => $data], 201);
@@ -165,8 +173,6 @@ class RentalController extends Controller
 
     private function record(User $u, ?Boardgame_tb $g, int $amount, string $type, array $extra = []): void
     {
-        $d = array_merge(['type' => $type, 'user_id' => $u->User_id, 'bg_id' => $g?->Bg_id, 'cost' => $amount, 'timestamp' => now()->toIso8601String()], $extra);
-        $this->blockchain->addTransaction($d);
         Transaction_tb::create([
             'User_id' => $u->User_id,
             'Bg_id' => $g?->Bg_id,

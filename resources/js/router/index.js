@@ -3,25 +3,14 @@ import { createRouter, createWebHistory } from 'vue-router';
 // ==========================================
 // 🛡️ ฝั่งแอดมิน (Admin Components)
 // ==========================================
-import AdminLogin from '../Pages/Auth/Login.vue'; 
-import Dashboard from '../Pages/Admin/Dashboard.vue';
-import BoardgameManager from '../Pages/Admin/BoardgameManager.vue';
-import UserManager from '../Pages/Admin/UserManager.vue';
-import TransactionManager from '../Pages/Admin/TransactionManager.vue';
-import RentalManager from '../Pages/Admin/RentalManager.vue';
 
 // ==========================================
 // 🚪 ฝั่งลูกค้า (User Components)
 // ==========================================
-import UserLayout from '../Layouts/UserLayout.vue'; 
-import UserHome from '../Pages/User/Home.vue';
-import UserMyGames from '../Pages/User/MyGames.vue'; // 🎯 หน้าเกมของฉัน
-import UserHistory from '../Pages/User/History.vue'; // 🎯 หน้าประวัติธุรกรรม
-import UserProfile from '../Pages/User/Profile.vue'; 
-import UserLogin from '../Pages/User/Login.vue';
-import UserRegister from '../Pages/User/Register.vue';
 
 const routes = [
+    { path: '/account-suspended', name: 'user.suspended', component: () => import('../Pages/Auth/AccountSuspended.vue') },
+    { path: '/admin/account-suspended', name: 'admin.suspended', component: () => import('../Pages/Auth/AccountSuspended.vue') },
     {
         path: '/home',
         redirect: '/'
@@ -32,27 +21,27 @@ const routes = [
     // ------------------------------------------
     {
         path: '/',
-        component: UserLayout, 
+        component: () => import('../Layouts/UserLayout.vue'),
         children: [
             {
                 path: '', 
                 name: 'user.home',
-                component: UserHome
+                component: () => import('../Pages/User/Home.vue')
             },
             {
                 path: 'mygames', 
                 name: 'user.mygames',
-                component: UserMyGames
+                component: () => import('../Pages/User/MyGames.vue')
             },
             {
                 path: 'history', 
                 name: 'user.history',
-                component: UserHistory
+                component: () => import('../Pages/User/History.vue')
             },
             {
                 path: 'profile', 
                 name: 'user.profile',
-                component: UserProfile
+                component: () => import('../Pages/User/Profile.vue')
             }
         ]
     },
@@ -63,12 +52,12 @@ const routes = [
     {
         path: '/login',
         name: 'user.login',
-        component: UserLogin
+        component: () => import('../Pages/User/Login.vue')
     },
     {
         path: '/register',
         name: 'user.register',
-        component: UserRegister
+        component: () => import('../Pages/User/Register.vue')
     },
 
     // ------------------------------------------
@@ -77,32 +66,32 @@ const routes = [
     {
         path: '/admin/login',
         name: 'admin.login',
-        component: AdminLogin
+        component: () => import('../Pages/Auth/Login.vue')
     },
     {
         path: '/admin',
         name: 'admin.dashboard',
-        component: Dashboard
+        component: () => import('../Pages/Admin/Dashboard.vue')
     },
     {
         path: '/admin/boardgames',
         name: 'admin.boardgames',
-        component: BoardgameManager
+        component: () => import('../Pages/Admin/BoardgameManager.vue')
     },
     {
         path: '/admin/users',
         name: 'admin.users',
-        component: UserManager
+        component: () => import('../Pages/Admin/UserManager.vue')
     },
     {
         path: '/admin/transactions',
         name: 'admin.transactions',
-        component: TransactionManager
+        component: () => import('../Pages/Admin/TransactionManager.vue')
     },
     {
         path: '/admin/rentals',
         name: 'admin.rentals',
-        component: RentalManager
+        component: () => import('../Pages/Admin/RentalManager.vue')
     }
 ];
 
@@ -118,6 +107,13 @@ router.beforeEach((to) => {
     const isAdminRoute = to.path.startsWith('/admin');
     const isAdminAuthenticated = localStorage.getItem('admin_token');
     const isUserAuthenticated = localStorage.getItem('user_token');
+    if (to.name === 'user.suspended' || to.name === 'admin.suspended') return true;
+    let suspension = null;
+    try { suspension = JSON.parse(sessionStorage.getItem('account_suspension')); } catch { /* Ignore invalid storage. */ }
+    if (suspension && suspension.isAdmin === isAdminRoute
+        && !['user.login', 'user.register', 'admin.login'].includes(to.name)) {
+        return { name: isAdminRoute ? 'admin.suspended' : 'user.suspended' };
+    }
 
     // 🛡️ 1. ตรวจสอบการเข้าถึงฝั่งแอดมิน
     if (isAdminRoute) {

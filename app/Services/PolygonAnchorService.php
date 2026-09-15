@@ -10,6 +10,8 @@ use RuntimeException;
 
 class PolygonAnchorService
 {
+    public function __construct(private BlockchainService $blockchain) {}
+
     public function anchor(Transaction_tb $transaction): array
     {
         $digest = $transaction->Chain_payload_hash ?: $this->digest($transaction);
@@ -71,16 +73,6 @@ class PolygonAnchorService
 
     public function digest(Transaction_tb $transaction): string
     {
-        $payload = [
-            'transaction_id' => (int) $transaction->Ts_id,
-            'user_id' => (int) $transaction->User_id,
-            'boardgame_id' => $transaction->Bg_id ? (int) $transaction->Bg_id : null,
-            'rental_id' => $transaction->Rental_id ? (int) $transaction->Rental_id : null,
-            'type' => $transaction->T_type,
-            'amount' => (int) $transaction->T_cost,
-            'created_at' => $transaction->created_at?->toISOString(),
-        ];
-
-        return '0x'.hash('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        return '0x'.$this->blockchain->blockForTransaction((int) $transaction->Ts_id)['hash'];
     }
 }

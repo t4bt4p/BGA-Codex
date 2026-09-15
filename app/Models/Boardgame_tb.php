@@ -2,12 +2,12 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Boardgame_tb extends Model
 {
-    use HasFactory;
+    use SoftDeletes;
 
     // 1. ระบุชื่อตาราง
     protected $table = 'Boardgame_tb';

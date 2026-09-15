@@ -2,13 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory; // 📌 เติมบรรทัดนี้
 use Illuminate\Database\Eloquent\Model;
 
 class Wallet_tb extends Model
 {
-    use HasFactory;
-
     protected $table = 'Wallet_tb';
     protected $primaryKey = 'Wallet_id';
 
@@ -16,9 +13,4 @@ class Wallet_tb extends Model
     // protected $fillable = ['Wallet_balance', ...];
     protected $fillable = ['Wallet_count',];
 
-    // 📌 เพิ่มฟังก์ชันเชื่อมความสัมพันธ์กลับไปหาตาราง User
-    public function user()
-    {
-        return $this->hasOne(User::class, 'Wallet_id', 'Wallet_id');
-    }
 }

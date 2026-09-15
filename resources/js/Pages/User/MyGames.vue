@@ -9,7 +9,7 @@
         </div>
 
         <!-- รายการเกมที่กำลังเช่า -->
-        <div class="d-flex flex-column gap-3 pb-4">
+        <div class="rental-grid pb-4">
             
             <div v-for="rent in activeRentals" :key="rent.Rental_id" class="bg-white rounded-4 p-3 shadow-sm border border-light d-flex flex-column gap-3">
                 <div class="d-flex gap-3">
@@ -29,17 +29,16 @@
                         <div class="bg-light px-2 py-1.5 rounded-3 border d-inline-block">
                             <span class="fw-bold" :class="rent.is_overdue ? 'text-danger' : 'text-secondary'" style="font-size: 11px;">
                                 <i class="fa-solid fa-clock me-1" :class="rent.is_overdue ? 'text-danger' : 'text-success'"></i>
-                                {{ rent.is_overdue ? `ค่าปรับสะสม ${rent.accrued_late_fee} โทเคน` : `กำหนดคืน ${formatDate(rent.due_at)}` }}
+                                {{ rent.is_overdue ? 'เลยกำหนดคืน' : `กำหนดคืน ${formatDate(rent.due_at)}` }}
                             </span>
                         </div>
                     </div>
                 </div>
 
                 <!-- ปุ่มคืนเกม (จะยิงไปหา Controller คุณ) -->
-                <button @click="returnGame(rent)" :disabled="!canAffordFine(rent)" class="btn w-100 fw-bold rounded-3 py-2 d-flex justify-content-center align-items-center gap-2 transition-transform" :class="canAffordFine(rent) ? 'btn-outline-success' : 'btn-outline-danger'" style="font-size: 14px; border-width: 2px;">
+                <button @click="returnGame(rent)" class="btn btn-outline-success w-100 fw-bold rounded-3 py-2 d-flex justify-content-center align-items-center gap-2 transition-transform" style="font-size: 14px; border-width: 2px;">
                     <i class="fa-solid fa-box-open"></i> คืนบอร์ดเกม
                 </button>
-                <small v-if="!canAffordFine(rent)" class="text-danger text-center fw-bold">ยอดโทเคนไม่พอชำระค่าปรับ กรุณาเติมโทเคนก่อนคืน</small>
             </div>
 
             <!-- กรณีคืนเกมหมดแล้ว หรือยังไม่ได้เช่า -->
@@ -93,17 +92,10 @@ export default {
                 year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
             });
         },
-        canAffordFine(rent) {
-            return Number(this.userProfile?.wallet?.Wallet_count || 0) >= Number(rent.accrued_late_fee || 0);
-        },
         returnGame(rent) {
-            if (!this.canAffordFine(rent)) return;
-            const feeText = Number(rent.accrued_late_fee || 0) > 0
-                ? `ระบบจะหักค่าปรับ ${Number(rent.accrued_late_fee).toLocaleString()} โทเคน`
-                : 'รายการนี้ไม่มีค่าปรับ';
             window.Swal.fire({
                 title: 'คืนบอร์ดเกม?',
-                text: `คืนเกม ${rent.boardgame?.Bg_name}: ${feeText}`,
+                text: `ยืนยันการคืนเกม ${rent.boardgame?.Bg_name}`,
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonColor: '#16a34a',

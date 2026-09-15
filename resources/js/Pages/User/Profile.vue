@@ -1,5 +1,5 @@
 <template>
-    <div class="p-3 fade-in d-flex flex-column gap-3">
+    <div class="user-profile-page p-3 fade-in d-flex flex-column gap-3">
         <h6 class="fw-bold mb-1 text-dark">บัญชีของฉัน</h6>
         
         <div class="card border-0 shadow-sm rounded-4 overflow-hidden text-center position-relative">

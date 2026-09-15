@@ -86,48 +86,6 @@ class CoreFlowTest extends TestCase
         $this->assertDatabaseHas('Boardgame_tb', ['Bg_id' => $game->Bg_id, 'Bg_use_status' => 1]);
     }
 
-    public function test_overdue_return_charges_one_full_rental_price_per_started_day(): void
-    {
-        Carbon::setTestNow('2026-09-10 12:00:00');
-        $user = $this->makeUser(100);
-        $game = $this->makeGame();
-        $rental = Rental_tb::create([
-            'User_id' => $user->User_id, 'Bg_id' => $game->Bg_id, 'Rental_cost' => 30,
-            'rented_at' => Carbon::now()->subDays(9), 'due_at' => Carbon::now()->subDay()->subHour(),
-            'Rental_status' => 'active',
-        ]);
-        $game->update(['Bg_use_status' => 0]);
-        app(BlockchainService::class)->addTransaction(['type' => 'topup_credit', 'user_id' => $user->User_id, 'cost' => 100]);
-        Sanctum::actingAs($user);
-
-        $this->postJson('/api/rentals/return', ['rental_id' => $rental->Rental_id])
-            ->assertOk()->assertJsonPath('late_fee', 60)->assertJsonPath('balance', 40);
-
-        $this->assertDatabaseHas('Rental_tb', ['Rental_id' => $rental->Rental_id, 'late_fee' => 60, 'Rental_status' => 'returned']);
-        $this->assertDatabaseHas('Wallet_tb', ['Wallet_id' => $user->Wallet_id, 'Wallet_count' => 40]);
-        Carbon::setTestNow();
-    }
-
-    public function test_overdue_game_cannot_be_returned_when_wallet_cannot_pay_the_fine(): void
-    {
-        Carbon::setTestNow('2026-09-10 12:00:00');
-        $user = $this->makeUser(20);
-        $game = $this->makeGame();
-        $rental = Rental_tb::create([
-            'User_id' => $user->User_id, 'Bg_id' => $game->Bg_id, 'Rental_cost' => 30,
-            'rented_at' => Carbon::now()->subDays(8), 'due_at' => Carbon::now()->subMinute(),
-            'Rental_status' => 'active',
-        ]);
-        $game->update(['Bg_use_status' => 0]);
-        Sanctum::actingAs($user);
-
-        $this->postJson('/api/rentals/return', ['rental_id' => $rental->Rental_id])->assertUnprocessable();
-
-        $this->assertDatabaseHas('Rental_tb', ['Rental_id' => $rental->Rental_id, 'Rental_status' => 'active']);
-        $this->assertDatabaseHas('Wallet_tb', ['Wallet_id' => $user->Wallet_id, 'Wallet_count' => 20]);
-        Carbon::setTestNow();
-    }
-
     public function test_admin_report_is_limited_to_the_selected_month(): void
     {
         $admin = $this->makeUser(0, 'admin');
@@ -147,6 +105,106 @@ class CoreFlowTest extends TestCase
             ->assertJsonPath('period_revenue', 60)
             ->assertJsonPath('period.from', '2026-08-01')
             ->assertJsonCount(31, 'daily_rentals');
+    }
+
+    public function test_overdue_account_is_blocked_with_an_existing_token_and_at_login(): void
+    {
+        $user = $this->makeUser(100);
+        $this->makeOverdueRental($user);
+        $token = $user->createToken('existing')->plainTextToken;
+        $this->withToken($token)->getJson('/api/user')->assertForbidden()
+            ->assertJsonPath('code', 'account_suspended')
+            ->assertJsonPath('reason', 'overdue')
+            ->assertJsonPath('message', 'บัญชีของคุณถูกระงับเนื่องจากบอร์ดเกมเกินกำหนด');
+        $this->withToken($token)->getJson('/api/transactions')->assertForbidden();
+        $this->withToken($token)->postJson('/api/topups', ['amount' => 100])->assertForbidden();
+        $this->assertSame(0, (int) $user->fresh()->User_status);
+        app('auth')->shouldUse('web');
+        $this->postJson('/api/login', ['username' => $user->User_username, 'password' => 'secret12'])
+            ->assertForbidden()->assertJsonPath('code', 'account_suspended')
+            ->assertJsonPath('message', 'บัญชีของคุณถูกระงับเนื่องจากบอร์ดเกมเกินกำหนด');
+    }
+
+    public function test_manually_disabled_account_does_not_claim_an_overdue_rental(): void
+    {
+        $user = $this->makeUser(0);
+        $user->update(['User_status' => 0]);
+        $this->postJson('/api/login', ['username' => $user->User_username, 'password' => 'secret12'])
+            ->assertForbidden()->assertJsonPath('code', 'account_suspended')->assertJsonPath('reason', 'disabled');
+    }
+
+    public function test_scheduler_suspends_only_active_rentals_past_the_deadline(): void
+    {
+        $this->freezeTime();
+        $late = $this->makeUser(100);
+        $dueNow = $this->makeUser(100);
+        $returned = $this->makeUser(100);
+        $this->makeOverdueRental($late);
+        $this->makeOverdueRental($dueNow)->update(['due_at' => now()]);
+        $this->makeOverdueRental($returned)->update(['Rental_status' => 'returned', 'returned_at' => now()]);
+        $this->artisan('rentals:suspend-overdue')->assertSuccessful();
+        $this->assertSame(0, (int) $late->fresh()->User_status);
+        $this->assertSame(1, (int) $dueNow->fresh()->User_status);
+        $this->assertSame(1, (int) $returned->fresh()->User_status);
+    }
+
+    public function test_admin_cannot_rent_or_reactivate_overdue_account_but_can_return_and_reactivate(): void
+    {
+        $user = $this->makeUser(100);
+        $rental = $this->makeOverdueRental($user);
+        Sanctum::actingAs($this->makeUser(0, 'admin'));
+        $this->postJson('/api/rentals/rent', ['User_id' => $user->User_id, 'Bg_id' => $this->makeGame()->Bg_id])
+            ->assertForbidden();
+        $this->putJson('/api/users/'.$user->User_id.'/status', ['User_status' => 1])->assertUnprocessable();
+        $this->postJson('/api/rentals/return', ['rental_id' => $rental->Rental_id])->assertOk();
+        $this->assertDatabaseHas('Rental_tb', [
+            'Rental_id' => $rental->Rental_id,
+            'User_id' => $user->User_id,
+            'returned_by_name' => 'Admin',
+            'returned_by_user_id' => auth()->id(),
+        ]);
+        $this->assertSame(0, (int) $user->fresh()->User_status);
+        $this->putJson('/api/users/'.$user->User_id.'/status', ['User_status' => 1])->assertOk();
+    }
+
+    public function test_rented_game_cannot_be_edited_until_returned(): void
+    {
+        $user = $this->makeUser(100);
+        $rental = $this->makeOverdueRental($user);
+        $game = $rental->boardgame;
+        Sanctum::actingAs($this->makeUser(0, 'admin'));
+        $data = $game->only(['Bg_name', 'Bg_cost', 'Bg_min_player', 'Bg_max_player', 'Bg_playduration', 'Bg_Catetogory_id']);
+        $data['Bg_name'] = 'Updated game';
+        $this->putJson('/api/boardgames/'.$game->Bg_id, $data)->assertStatus(409);
+        $this->assertSame('Test Game', $game->fresh()->Bg_name);
+        $this->postJson('/api/rentals/return', ['rental_id' => $rental->Rental_id])->assertOk();
+        $this->putJson('/api/boardgames/'.$game->Bg_id, $data)->assertOk();
+        $this->assertSame('Updated game', $game->fresh()->Bg_name);
+    }
+
+    public function test_admin_can_return_overdue_game_without_charging_a_fee(): void
+    {
+        $user = $this->makeUser(0);
+        $rental = $this->makeOverdueRental($user);
+        $game = $rental->boardgame;
+        Sanctum::actingAs($this->makeUser(0, 'admin'));
+
+        $this->postJson('/api/rentals/return', ['rental_id' => $rental->Rental_id])
+            ->assertOk()
+            ->assertJsonPath('forced_by_admin', true)
+            ->assertJsonMissing(['late_fee', 'late_fee_status']);
+
+        $this->assertSame('returned', $rental->fresh()->Rental_status);
+        $this->assertSame(0, (int) $user->wallet->fresh()->Wallet_count);
+        $this->assertSame(1, (int) $game->fresh()->Bg_use_status);
+    }
+
+    private function makeOverdueRental(User $user): Rental_tb
+    {
+        return Rental_tb::create([
+            'User_id' => $user->User_id, 'Bg_id' => $this->makeGame()->Bg_id, 'Rental_cost' => 30,
+            'rented_at' => now()->subDays(2), 'due_at' => now()->subMinute(), 'Rental_status' => 'active',
+        ]);
     }
 
     private function makeUser(int $balance, string $role = 'user'): User

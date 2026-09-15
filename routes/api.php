@@ -26,10 +26,10 @@ Route::get('/categories', [BoardgameCategoryController::class, 'index']);
 Route::get('/boardgames', [BoardgameController::class, 'index']);
 
 // เส้นทางที่ต้องใช้ Token (บัตรผ่าน) ถึงจะเข้าได้
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsureAccountActive::class])->group(function () {
 
     // เส้นทางสำหรับ Logout
-    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/logout', [AuthController::class, 'logout'])->withoutMiddleware(\App\Http\Middleware\EnsureAccountActive::class);
 
     // ดึงข้อมูล User ปัจจุบัน (Laravel ใส่มาให้เป็นค่าเริ่มต้น เก็บไว้ได้ครับ)
     Route::get('/user', function (Request $request) {
@@ -59,6 +59,9 @@ Route::middleware('auth:sanctum')->group(function () {
         });
         Route::post('/blockchain/repair', function (BlockchainService $blockchain) {
             return response()->json($blockchain->repairNetwork());
+        });
+        Route::post('/blockchain/reconcile', function (BlockchainService $blockchain) {
+            return response()->json($blockchain->reconcileTransactions());
         });
         Route::get('/reports/dashboard', [ReportController::class, 'dashboard']);
         Route::post('/transactions/{transaction}/polygon/retry', [TransactionController::class, 'retryPolygon']);

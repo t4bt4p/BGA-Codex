@@ -82,10 +82,24 @@ services:
             - sail
         depends_on:
             - mysql
+    scheduler:
+        image: 'sail-8.5/app'
+        command: php artisan schedule:work
+        restart: unless-stopped
+        environment:
+            WWWUSER: '${WWWUSER:-1000}'
+            LARAVEL_SAIL: 1
+        volumes:
+            - '.:/var/www/html'
+        networks:
+            - sail
+        depends_on:
+            mysql:
+                condition: service_healthy
     phpmyadmin:
         image: 'phpmyadmin:latest'
         ports:
-            - 8080:80
+            - '${PHPMYADMIN_PORT:-8080}:80'
         environment:
             PMA_HOST: mysql
             PMA_USER: '${DB_USERNAME}'

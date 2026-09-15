@@ -1,12 +1,11 @@
 <template>
-    <div class="d-flex justify-content-center bg-dark" style="min-height: 100vh; font-family: 'Sarabun', sans-serif;">
+    <div class="user-app">
         <!-- Mobile Container Wrapper -->
-        <div class="bg-light position-relative d-flex flex-column shadow-lg overflow-hidden"
-            style="width: 100%; max-width: 430px; height: 100dvh; min-height: 100svh;">
+        <div class="user-shell bg-light position-relative overflow-hidden">
 
             <!-- Header (Top Bar) -->
             <header
-                class="bg-white sticky-top d-flex align-items-center justify-content-between px-3 py-3 border-bottom shadow-sm"
+                class="user-header bg-white d-flex align-items-center justify-content-between px-3 py-3 border-bottom"
                 style="z-index: 1030;">
                 <div class="d-flex align-items-center gap-2">
                     <div class="bg-success rounded text-white d-flex align-items-center justify-content-center"
@@ -18,25 +17,47 @@
                 </div>
 
                 <div class="d-flex align-items-center gap-3">
+                    <button v-if="userProfile" class="desktop-action btn btn-success rounded-pill px-4" @click="openTopupModal">เติมโทเคน</button>
+                    <router-link v-else class="desktop-action btn btn-success rounded-pill px-4" :to="{ name: 'user.login' }">เข้าสู่ระบบ</router-link>
                     <div
                         class="badge rounded-pill bg-success bg-opacity-10 text-success border border-success d-flex align-items-center gap-2 px-3 py-1">
                         <!-- 🎯 ยอดเงินจะเปลี่ยนตรงนี้ทันทีแบบ Real-time -->
                         <span class="fw-bold fs-6">{{ userProfile?.wallet?.Wallet_count || 0 }}</span>
                         <div class="bg-success rounded-circle" style="width: 8px; height: 8px;"></div>
                     </div>
-                    <img src="https://i.pravatar.cc/150?img=11" alt="Profile"
+                    <router-link :to="{ name: 'user.profile' }" aria-label="บัญชีของฉัน"><img src="https://i.pravatar.cc/150?img=11" alt=""
                         class="rounded-circle border border-2 border-white shadow-sm"
-                        style="width: 32px; height: 32px; object-fit: cover;">
+                        style="width: 32px; height: 32px; object-fit: cover;"></router-link>
                 </div>
             </header>
 
+            <aside class="user-sidebar">
+                <p class="sidebar-label">พื้นที่ของคุณ</p>
+                <nav aria-label="เมนูผู้ใช้งาน">
+                    <router-link :to="{ name: 'user.home' }" exact-active-class="selected"><i class="fa-solid fa-house"></i> ค้นหาบอร์ดเกม</router-link>
+                    <router-link :to="{ name: 'user.mygames' }" exact-active-class="selected"><i class="fa-solid fa-box-open"></i> เกมของฉัน</router-link>
+                    <router-link :to="{ name: 'user.history' }" exact-active-class="selected"><i class="fa-solid fa-clock-rotate-left"></i> ประวัติธุรกรรม</router-link>
+                    <router-link :to="{ name: 'user.profile' }" exact-active-class="selected"><i class="fa-solid fa-user"></i> บัญชีของฉัน</router-link>
+                </nav>
+                <div class="sidebar-wallet">
+                    <i class="fa-solid fa-wallet text-success mb-3" aria-hidden="true"></i>
+                    <p>{{ userProfile ? 'โทเคนพร้อมใช้' : 'พร้อมเริ่มเกมถัดไปหรือยัง?' }}</p>
+                    <strong v-if="userProfile">{{ Number(userProfile.wallet?.Wallet_count || 0).toLocaleString() }} <small>โทเคน</small></strong>
+                    <p v-else class="small">สมัครสมาชิกเพื่อเช่าบอร์ดเกมและจัดการกระเป๋าเงินของคุณ</p>
+                    <button v-if="userProfile" class="btn btn-success w-100 mt-3" @click="openTopupModal">เติมโทเคน</button>
+                    <router-link v-else :to="{ name: 'user.register' }" class="btn btn-success w-100 mt-2">สมัครสมาชิก</router-link>
+                </div>
+            </aside>
+
             <!-- 🎯 Main Content Area (หน้า Home หรือ Profile จะมาโผล่ตรงนี้) -->
-            <main class="flex-grow-1 overflow-auto hide-scroll position-relative" style="padding-bottom: 90px;">
+            <main class="user-main overflow-auto position-relative">
+                <div class="user-content">
                 <router-view :userProfile="userProfile" @refresh-wallet="fetchUserProfile"></router-view>
+                </div>
             </main>
 
            <!-- Bottom Navigation -->
-            <nav class="position-absolute bottom-0 w-100 bg-white border-top d-flex justify-content-around align-items-center pt-2 px-2 shadow-lg"
+            <nav aria-label="เมนูมือถือ" class="user-bottom-nav position-absolute bottom-0 w-100 bg-white border-top d-flex justify-content-around align-items-center pt-2 px-2 shadow-lg"
                 style="z-index: 1040; padding-bottom: 24px;">
 
                 <!-- 1. หน้าแรก -->
@@ -59,7 +80,7 @@
 
                 <!-- 3. ปุ่ม QR Code ตรงกลาง (Gradient) -->
                 <div class="position-relative" style="top: -28px;">
-                    <button @click="openTopupModal"
+                    <button @click="openTopupModal" aria-label="เติมโทเคน"
                         class="btn rounded-circle shadow-lg d-flex align-items-center justify-content-center transition-transform"
                         style="width: 64px; height: 64px; background: linear-gradient(to top right, #22c55e, #16a34a); border: 4px solid white;">
                         <i class="fa-solid fa-qrcode text-white fs-3"></i>
@@ -97,18 +118,27 @@ export default {
     name: 'UserLayout',
     data() {
         return {
-            userProfile: null
+            userProfile: null,
+            accountCheckTimer: null
         }
     },
     async mounted() {
         await this.fetchUserProfile();
+        // Wallet changes are refreshed after payments; use a slower health check to avoid needless API traffic.
+        this.accountCheckTimer = window.setInterval(() => this.fetchUserProfile(), 60000);
+    },
+    beforeUnmount() {
+        window.clearInterval(this.accountCheckTimer);
     },
     methods: {
         async fetchUserProfile() {
+            if (!localStorage.getItem('user_token')) return;
             try {
                 const response = await axios.get('/api/user');
                 this.userProfile = response.data;
             } catch (error) {
+                if (error.response?.data?.code === 'account_suspended') return;
+                if (error.response?.status !== 401) return;
                 localStorage.removeItem('user_token');
                 // หน้าแรกดูรายการเกมได้โดยไม่ต้องล็อกอิน; หน้าอื่นให้ route guard จัดการ
                 if (this.$route.name !== 'user.home') {
@@ -119,10 +149,14 @@ export default {
 
         // สร้างคำขอเติมเงินและแสดง QR ตามยอดที่เลือก
         openTopupModal() {
+            if (!localStorage.getItem('user_token')) {
+                this.$router.push({ name: 'user.login' });
+                return;
+            }
             const amounts = [20, 50, 100, 500, 1000];
             let topupPoller = null;
             window.Swal.fire({
-                title: 'เติมโทเค่น',
+                title: 'เติมโทเคน',
                 width: '390px',
                 padding: '1rem',
                 html: `
@@ -146,9 +180,15 @@ export default {
                     </div>
                 `,
                 showConfirmButton: false,
+                showCloseButton: true,
                 showCancelButton: false,
                 didOpen: () => {
                     const createCharge = async (amount) => {
+                        const createButton = document.getElementById('create-topup-qr');
+                        if (!createButton || createButton.disabled) return;
+                        createButton.disabled = true;
+                        createButton.dataset.label = createButton.textContent;
+                        createButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>กำลังสร้าง QR...';
                         try {
                             const response = await axios.post('/api/topups', { amount });
                             const scannable = response.data?.charge?.source?.scannable_code;
@@ -188,6 +228,11 @@ export default {
                             }
                         } catch (error) {
                             window.Swal.showValidationMessage(error.response?.data?.message || error.message || 'ไม่สามารถสร้างรายการชำระเงินได้');
+                        } finally {
+                            if (createButton.isConnected) {
+                                createButton.disabled = false;
+                                createButton.textContent = createButton.dataset.label || 'สร้าง QR สำหรับชำระเงิน';
+                            }
                         }
                     };
                     const render = async (amount) => {

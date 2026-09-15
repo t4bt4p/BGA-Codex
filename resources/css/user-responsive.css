@@ -1,0 +1,56 @@
+.user-app { min-height: 100dvh; font-family: 'Sarabun', sans-serif; background: #f5f7f6; }
+.user-shell { width: 100%; height: 100dvh; display: flex; flex-direction: column; }
+.user-header { flex-shrink: 0; }
+.user-main { flex: 1; min-height: 0; min-width: 0; padding-bottom: 100px; }
+.user-content { width: 100%; min-width: 0; }
+.user-sidebar, .desktop-action, .desktop-welcome { display: none; }
+.game-grid, .rental-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.game-grid > .text-center, .rental-grid > .text-center { grid-column: 1 / -1; }
+.game-grid .card-body > button { margin-top: auto; }
+.user-auth { min-height: 100dvh; display: grid; place-items: center; background: #f0f5f2; font-family: 'Sarabun', sans-serif; }
+.user-auth-card { width: 100%; max-width: 480px; min-height: 100dvh; }
+.auth-copy { display: none; }
+@media (min-width: 768px) {
+    .game-grid, .rental-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+    .user-auth { padding: 40px 24px; }
+    .user-auth-card { min-height: auto; border-radius: 24px; overflow: hidden; }
+    .user-profile-page { max-width: 760px; margin: 0 auto; }
+}
+@media (min-width: 992px) {
+    .user-shell { display: grid; grid-template-columns: 240px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+    .user-header { grid-column: 1 / -1; padding: 20px 32px !important; }
+    .desktop-action { display: inline-block; }
+    .user-sidebar { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; padding: 32px 20px; background: white; border-right: 1px solid #e5ebe7; }
+    .sidebar-label { padding: 0 14px; color: #85938a; font-size: 12px; }
+    .user-sidebar nav { display: grid; gap: 8px; }
+    .user-sidebar nav a { display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 12px; text-decoration: none; color: #617168; font-weight: 600; }
+    .user-sidebar nav a:hover { background: #f3f8f5; color: #14532d; }
+    .user-sidebar nav a.selected { background: #e6f5ec; color: #15803d; }
+    .user-sidebar nav i { width: 20px; text-align: center; }
+    .sidebar-wallet { margin-top: 40px; padding: 20px 16px; background: #f3f8f5; border: 1px solid #dcebe2; border-radius: 18px; }
+    .sidebar-wallet p { color: #66786d; margin-bottom: 8px; }
+    .sidebar-wallet strong { color: #14532d; font-size: 28px; }
+    .sidebar-wallet small { font-size: 12px; }
+    .user-bottom-nav { display: none !important; }
+    .user-main { padding: 32px 24px 48px; }
+    .user-content { max-width: 1440px; margin: 0 auto; }
+    .desktop-welcome { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin: 0 16px 28px; padding: 36px; border-radius: 24px; background: linear-gradient(115deg, #0c442b, #187448); color: white; }
+    .desktop-welcome p { margin-bottom: 12px; font-size: 14px; color: #bde8cd; }
+    .desktop-welcome h1 { font-size: clamp(28px, 3vw, 42px); line-height: 1.4; font-weight: 700; margin-bottom: 16px; }
+    .desktop-welcome span { color: #d6ecdf; line-height: 1.8; }
+    .welcome-dice { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 32px; flex: 0 0 auto; padding: 24px; margin: 0 20px; border-radius: 28px; transform: rotate(-12deg); background: #c6edd1; box-shadow: 10px 14px 0 #092f2433; }
+    .welcome-dice span { display: block; width: 18px; height: 18px; border-radius: 50%; background: #176440; }
+    .user-app .user-main .search-panel { position: relative !important; border: 1px solid #e3ebe6; border-radius: 16px; width: calc(100% - 32px); margin: 0 16px; padding: 20px !important; }
+    .user-main .category-pill { color: #617168; }
+    .user-main .category-pill.active { color: white; }
+    .user-app .user-main .advanced-filters { grid-template-columns: 1fr 1fr auto; align-items: end; }
+    .user-app .user-main .clear-filter-wrap { grid-column: auto; }
+    .user-auth-card { max-width: 960px; display: grid !important; grid-template-columns: 1fr 1fr; }
+    .user-auth-card .auth-visual { grid-column: 1; grid-row: 1 / 3; height: auto !important; min-height: 520px; border-radius: 0 !important; padding: 40px; }
+    .user-auth-card > :not(.auth-visual) { grid-column: 2; }
+    .auth-copy { display: block; text-align: center; color: #c8ead5; margin-top: 28px; line-height: 1.9; }
+    .user-auth-card .auth-visual h2 { font-size: 40px; }
+}
+@media (min-width: 1280px) {
+    .game-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

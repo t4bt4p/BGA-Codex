@@ -1,5 +1,6 @@
 import './bootstrap'; 
 import 'bootstrap/dist/css/bootstrap.min.css'; // โหลด CSS ของ Bootstrap
+import '../css/user-responsive.css';
 import 'bootstrap'; // โหลด JS ของ Bootstrap
 
 import { createApp } from 'vue';

@@ -11,8 +11,6 @@ use RuntimeException;
 
 class TopupSettlementService
 {
-    public function __construct(private BlockchainService $blockchain) {}
-
     public function sync(Topup_request_tb $topup): Topup_request_tb
     {
         if ($topup->Status === 'approved') {
@@ -24,6 +22,8 @@ class TopupSettlementService
         }
 
         $charge = Http::withBasicAuth(config('services.opn.secret_key'), '')
+            ->connectTimeout(2)
+            ->timeout(8)
             ->get("https://api.omise.co/charges/{$topup->Provider_charge_id}");
 
         if (! $charge->successful() || $charge->json('id') !== $topup->Provider_charge_id) {
@@ -50,15 +50,6 @@ class TopupSettlementService
             $amount = (int) ($amountSatang / 100);
             $user = User::findOrFail($locked->User_id);
             $wallet = $user->wallet()->lockForUpdate()->firstOrFail();
-            $this->blockchain->addTransaction([
-                'type' => 'topup_credit',
-                'user_id' => $user->User_id,
-                'bg_id' => null,
-                'cost' => $amount,
-                'reference' => $locked->Reference,
-                'provider_charge_id' => $locked->Provider_charge_id,
-                'timestamp' => now()->toIso8601String(),
-            ]);
             Transaction_tb::create([
                 'User_id' => $user->User_id,
                 'T_cost' => $amount,

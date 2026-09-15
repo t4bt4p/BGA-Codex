@@ -3,6 +3,21 @@
         <template #header>ประวัติธุรกรรม (Transaction History)</template>
 
         <div class="fade-in-section">
+            <div class="row g-3 mt-1 mb-3">
+                <div class="col-md-4"><div class="bg-white rounded-4 shadow-sm border p-3 h-100">
+                    <div class="text-muted small">Private Blockchain</div>
+                    <div class="fw-bold fs-5" :class="blockchainSummary?.success ? 'text-success' : 'text-danger'">{{ blockchainSummary?.success ? 'ข้อมูลครบถ้วน' : 'ต้องตรวจสอบ' }}</div>
+                </div></div>
+                <div class="col-md-4"><div class="bg-white rounded-4 shadow-sm border p-3 h-100">
+                    <div class="text-muted small">จำนวนบล็อกธุรกรรม</div>
+                    <div class="fw-bold fs-5">{{ blockchainSummary?.transaction_block_count ?? '—' }}</div>
+                </div></div>
+                <div class="col-md-4"><div class="bg-white rounded-4 shadow-sm border p-3 h-100">
+                    <div class="text-muted small">บล็อกล่าสุด</div>
+                    <div class="fw-bold">{{ latestBlockLabel }}</div>
+                    <div class="text-muted small text-truncate">{{ latestBlockHash }}</div>
+                </div></div>
+            </div>
             <!-- 🛡️ เพิ่มปุ่ม Verify Blockchain ไว้ด้านบนขวาของตาราง -->
             <div class="d-flex justify-content-end mt-3 mb-2">
                 <button @click="verifyBlockchain" class="btn btn-dark shadow-sm fw-bold px-4 rounded-pill">
@@ -50,8 +65,8 @@
                                     <span v-if="ts.T_type === 'topup_credit'" class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1">
                                         <i class="fa-solid fa-arrow-trend-up me-1"></i> เติมเงิน
                                     </span>
-                                    <span v-else-if="['rental_debit', 'late_fee_debit', 'admin_debit'].includes(ts.T_type)" class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-2 py-1">
-                                        <i class="fa-solid fa-arrow-trend-down me-1"></i> {{ ts.T_type === 'rental_debit' ? 'เช่าเกม' : (ts.T_type === 'late_fee_debit' ? 'ค่าปรับ' : 'หักโทเคน') }}
+                                    <span v-else-if="['rental_debit', 'admin_debit'].includes(ts.T_type)" class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-2 py-1">
+                                        <i class="fa-solid fa-arrow-trend-down me-1"></i> {{ ts.T_type === 'rental_debit' ? 'เช่าเกม' : 'หักโทเคน' }}
                                     </span>
                                     <span v-else-if="ts.T_type === 'return_event'" class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1">
                                         <i class="fa-solid fa-rotate-left me-1"></i> คืนเกม
@@ -113,19 +128,34 @@ export default {
     data() {
         return {
             transactions: [],
-            polygonPoller: null
+            blockchainSummary: null,
+            dataPoller: null,
+            visibilityHandler: null,
+            isRefreshing: false
         };
     },
+    computed: {
+        latestBlockLabel() {
+            const block = this.blockchainSummary?.latest_block;
+            if (!block || !this.blockchainSummary?.consensus) return '—';
+            return `#${block.index} · ${new Date(block.timestamp).toLocaleString('th-TH')}`;
+        },
+        latestBlockHash() {
+            const hash = this.blockchainSummary?.latest_block?.hash;
+            return hash ? `${hash.slice(0, 10)}…${hash.slice(-8)}` : '—';
+        }
+    },
     mounted() {
-        this.fetchTransactions();
-        this.polygonPoller = window.setInterval(() => {
-            if (this.transactions.some(transaction => ['pending', 'processing'].includes(transaction.Chain_status))) {
-                this.fetchTransactions();
-            }
-        }, 5000);
+        this.refreshData();
+        // Keep the latest node JSON/index in sync after a transaction is created.
+        // Use arrow callbacks so Vue's component context is preserved.
+        this.dataPoller = window.setInterval(() => this.refreshData(), 3000);
+        this.visibilityHandler = () => this.refreshWhenVisible();
+        document.addEventListener('visibilitychange', this.visibilityHandler);
     },
     beforeUnmount() {
-        window.clearInterval(this.polygonPoller);
+        window.clearInterval(this.dataPoller);
+        document.removeEventListener('visibilitychange', this.visibilityHandler);
     },
     methods: {
         formatDate(value) {
@@ -141,6 +171,25 @@ export default {
             } catch (error) {
                 console.error('ไม่สามารถโหลดประวัติธุรกรรมได้', error);
             }
+        },
+        async fetchBlockchainSummary() {
+            const response = await window.axios.get('/api/blockchain/verify');
+            this.blockchainSummary = response.data;
+            return response.data;
+        },
+        async refreshData() {
+            if (this.isRefreshing) return;
+            this.isRefreshing = true;
+            try {
+                await Promise.all([this.fetchTransactions(), this.fetchBlockchainSummary()]);
+            } catch (error) {
+                console.error('ไม่สามารถอัปเดตข้อมูลล่าสุดได้', error);
+            } finally {
+                this.isRefreshing = false;
+            }
+        },
+        refreshWhenVisible() {
+            if (document.visibilityState === 'visible') this.refreshData();
         },
         async retryPolygon(transaction) {
             try {
@@ -161,8 +210,7 @@ export default {
             });
 
             try {
-                const response = await window.axios.get('/api/blockchain/verify');
-                const data = response.data;
+                const data = await this.fetchBlockchainSummary();
 
                 let nodesHtml = '<div class="text-start mt-3">';
                 data.nodes.forEach(node => {
@@ -178,6 +226,15 @@ export default {
                         </div>
                     `;
                 });
+                if (data.missing_transaction_ids?.length) {
+                    nodesHtml += `<div class="alert alert-warning py-2">ธุรกรรมที่ตกหล่น: ${data.missing_transaction_ids.join(', ')}</div>`;
+                }
+                if (data.mismatched_transaction_ids?.length) {
+                    nodesHtml += `<div class="alert alert-danger py-2">ข้อมูลธุรกรรมไม่ตรงกับบล็อกเดิม: ${data.mismatched_transaction_ids.map(Number).join(', ')}</div>`;
+                }
+                if (data.orphaned_transaction_ids?.length) {
+                    nodesHtml += `<div class="alert alert-danger py-2">ธุรกรรมที่หายจากฐานข้อมูล: ${data.orphaned_transaction_ids.map(Number).join(', ')}</div>`;
+                }
                 nodesHtml += '</div>';
 
                 const isSuccess = data.success;
@@ -185,7 +242,7 @@ export default {
                 // แจ้งเตือนเสร็จแล้วดักจับการกดปุ่ม "รับทราบ"
                 window.Swal.fire({
                     icon: isSuccess ? 'success' : 'warning',
-                    title: isSuccess ? 'เครือข่ายปลอดภัย' : 'พบข้อผิดพลาดในเครือข่าย!',
+                    title: isSuccess ? 'ตรวจสอบข้อมูลผ่าน' : 'พบข้อผิดพลาดในเครือข่าย!',
                     html: `<strong class="${isSuccess ? 'text-success' : 'text-danger'} fs-5">${data.message}</strong>` + nodesHtml,
                     confirmButtonText: 'รับทราบ',
                     width: '500px'

@@ -1,16 +1,17 @@
 <template>
-    <div class="d-flex justify-content-center bg-dark" style="min-height: 100vh; font-family: 'Sarabun', sans-serif;">
+    <div class="user-auth">
         <!-- Mobile Container Wrapper -->
-        <div class="bg-white position-relative d-flex flex-column shadow-lg overflow-auto hide-scroll" style="width: 100%; max-width: 430px; height: 100vh;">
+        <div class="user-auth-card bg-white position-relative d-flex flex-column shadow-lg">
             
             <!-- Header Graphic -->
-            <div class="position-relative d-flex flex-column align-items-center justify-content-center shadow-sm" style="height: 160px; background: linear-gradient(135deg, #16a34a 0%, #14532d 100%); border-radius: 0 0 40px 40px; overflow: hidden;">
+            <div class="auth-visual position-relative d-flex flex-column align-items-center justify-content-center shadow-sm" style="height: 160px; background: linear-gradient(135deg, #16a34a 0%, #14532d 100%); border-radius: 0 0 40px 40px; overflow: hidden;">
                 <i class="fa-solid fa-chess-knight position-absolute text-white opacity-10" style="font-size: 5rem; left: -10px; top: 10px; transform: rotate(-12deg);"></i>
                 <h2 class="fw-bold text-white mb-0 position-relative mt-3" style="z-index: 10; letter-spacing: 1px;">BGA<span style="color: #86efac;">Vault</span></h2>
+                <p class="auth-copy">สร้างบัญชีของคุณ<br>แล้วค้นพบบอร์ดเกมโปรดเกมถัดไป</p>
             </div>
 
             <!-- Auth Tabs (แท็บสลับหน้า) -->
-            <div class="d-flex mx-4 mt-4 bg-light rounded-4 p-1 shadow-sm">
+            <div class="auth-tabs d-flex mt-4 bg-light rounded-4 p-1 shadow-sm">
                 <router-link :to="{ name: 'user.login' }" class="btn text-muted fw-bold flex-grow-1 rounded-3 py-2 text-decoration-none border-0" style="font-size: 14px;">เข้าสู่ระบบ</router-link>
                 <button class="btn bg-white text-success fw-bold flex-grow-1 rounded-3 shadow-sm py-2 border-0" style="font-size: 14px;">สมัครสมาชิก</button>
             </div>
@@ -78,6 +79,7 @@ export default {
 
                 if (response.data.status === 'success') {
                     localStorage.setItem('user_token', response.data.token);
+                    sessionStorage.removeItem('account_suspension');
                     localStorage.removeItem('admin_token');
 
                     window.Swal.fire({
@@ -108,6 +110,8 @@ export default {
 .hide-scroll::-webkit-scrollbar { display: none; }
 .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
 .fade-in { animation: fadeIn 0.3s ease-out forwards; }
+.auth-tabs { width: calc(100% - 32px); max-width: 340px; min-height: 46px; margin-inline: auto; align-self: center; flex: 0 0 auto; }
+.auth-tabs .btn { min-height: 38px; padding: 8px 12px !important; line-height: 1.2; }
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }

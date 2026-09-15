@@ -5,23 +5,15 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\Transaction_tb;
 use App\Models\User;
-use App\Services\BlockchainService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB; // 📌 1. นำเข้า Blockchain Service
 
 class UserController extends Controller
 {
-    protected $blockchain;
-
-    // 📌 2. ฉีด BlockchainService ผ่าน Constructor
-    public function __construct(BlockchainService $blockchain)
-    {
-        $this->blockchain = $blockchain;
-    }
-
     // ดึงข้อมูลผู้ใช้ทั้งหมด
     public function index()
     {
+        app(\App\Services\OverdueAccountService::class)->suspendOverdueAccounts();
         // 📌 สั่งดึงข้อมูล User พร้อมข้อมูล Wallet ที่เชื่อมกันอยู่
         $users = User::with('wallet')->get();
 
@@ -41,6 +33,9 @@ class UserController extends Controller
             'User_status' => 'required|integer|in:0,1', // สมมติ 1 = ใช้งานได้, 0 = ระงับ
         ]);
 
+        abort_if((int) $request->User_status === 1
+            && app(\App\Services\OverdueAccountService::class)->hasOverdue($user),
+            422, 'ต้องคืนบอร์ดเกมที่เกินกำหนดก่อนเปิดใช้งานบัญชี');
         $user->update(['User_status' => $request->User_status]);
 
         return response()->json([
@@ -56,7 +51,7 @@ class UserController extends Controller
             'amount' => 'required|integer|min:1',
             'action' => 'required|string|in:add,deduct',
         ]);
-        [$wallet, $newBlock] = DB::transaction(function () use ($request, $id) {
+        $wallet = DB::transaction(function () use ($request, $id) {
             $user = User::findOrFail($id);
             $wallet = $user->wallet()->lockForUpdate()->firstOrFail();
             $amount = (int) $request->amount;
@@ -65,22 +60,16 @@ class UserController extends Controller
                 abort(422, 'ยอดเงินในกระเป๋าไม่เพียงพอให้หัก');
             }
             $newBalance = (int) $wallet->Wallet_count + ($type === 'topup_credit' ? $amount : -$amount);
-            $block = $this->blockchain->addTransaction([
-                'type' => $type, 'user_id' => $user->User_id, 'bg_id' => null,
-                'user_name' => $user->User_name, 'cost' => $amount,
-                'timestamp' => now()->toIso8601String(),
-            ]);
             Transaction_tb::create(['User_id' => $user->User_id, 'Bg_id' => null, 'T_cost' => $amount, 'T_type' => $type]);
             $wallet->update(['Wallet_count' => $newBalance]);
 
-            return [$wallet->fresh(), $block];
+            return $wallet->fresh();
         });
 
         return response()->json([
             'status' => 'success',
-            'message' => 'อัปเดตยอดเงินสำเร็จ และบันทึกลงบล็อกเชนเรียบร้อย!',
+            'message' => 'อัปเดตยอดเงินสำเร็จ และส่งรายการไปบันทึกลงบล็อกเชนแล้ว',
             'balance' => $wallet->Wallet_count,
-            'block' => $newBlock, // ส่งข้อมูลบล็อกใหม่กลับไปให้หน้าเว็บเผื่อต้องการใช้งาน
         ]);
     }
 

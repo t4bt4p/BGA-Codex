@@ -24,7 +24,6 @@ class AuthController extends Controller
         $credentials = [
             'User_username' => $request->username,
             'password' => $request->password,
-            'User_status' => 1,
             'User_role' => 'user',
         ];
 
@@ -32,6 +31,11 @@ class AuthController extends Controller
 
             /** @var User $user */
             $user = Auth::user();
+            app(\App\Services\OverdueAccountService::class)->suspendIfOverdue($user);
+            if ((int) $user->User_status !== 1) {
+                Auth::logout();
+                return response()->json(app(\App\Services\OverdueAccountService::class)->suspensionDetails($user), 403);
+            }
 
             $token = $user->createToken('user-token')->plainTextToken;
 
@@ -96,7 +100,6 @@ class AuthController extends Controller
         $credentials = [
             'User_username' => $request->username,
             'password' => $request->password,
-            'User_status' => 1,
             'User_role' => 'admin',
         ];
 
@@ -104,6 +107,11 @@ class AuthController extends Controller
 
             /** @var User $user */
             $user = Auth::user();
+            app(\App\Services\OverdueAccountService::class)->suspendIfOverdue($user);
+            if ((int) $user->User_status !== 1) {
+                Auth::logout();
+                return response()->json(app(\App\Services\OverdueAccountService::class)->suspensionDetails($user), 403);
+            }
 
             $token = $user->createToken('admin-token')->plainTextToken;
 

@@ -239,7 +239,12 @@ export default {
         },
 
         async processReturn(bg) {
-            const userOptions = this.users.map(u => `<option value="${Number(u.User_id)}">${this.escapeHtml(u.User_name)}</option>`).join('');
+            const rental = this.rentals.find(r => Number(r.Bg_id) === Number(bg.Bg_id) && r.Rental_status === 'active');
+            if (!rental) {
+                await window.Swal.fire({ icon: 'error', title: 'ไม่พบรายการเช่าที่ค้างอยู่', text: 'กรุณารีเฟรชข้อมูลแล้วลองอีกครั้ง' });
+                await this.fetchData();
+                return;
+            }
 
             const { value: returnData } = await window.Swal.fire({
                 title: 'รับคืนบอร์ดเกม',
@@ -248,38 +253,27 @@ export default {
                         <div>เกมที่รับคืน: <strong>${this.escapeHtml(bg.Bg_name)}</strong></div>
                     </div>
                     <div class="text-start mb-3">
-                        <label class="form-label fw-bold small text-muted">เลือกลูกค้าที่นำมาคืน</label>
-                        <select id="swal-return-user" class="form-select bga-select">
-                            <option value="">-- กรุณาเลือกลูกค้า --</option>
-                            ${userOptions}
-                        </select>
+                        <div>ผู้ทำรายการคืน: <strong>Admin</strong></div>
+                        <div>ผู้เช่าเดิม: ${this.escapeHtml(rental.user?.User_name || '-')}</div>
                     </div>
-                    <div class="alert alert-warning small mb-0">ระบบจะคำนวณค่าปรับอัตโนมัติวันละ 100% ของราคาเช่า และตรวจยอด Wallet ก่อนรับคืน</div>
+                    <div class="alert alert-warning small mb-0">แอดมินสามารถรับคืนเกมและบันทึกผู้ทำรายการคืนได้</div>
                 `,
                 focusConfirm: false,
                 showCancelButton: true,
                 confirmButtonColor: '#ffc107',
                 confirmButtonText: 'ยืนยันรับคืน',
                 cancelButtonText: 'ยกเลิก',
-                preConfirm: () => {
-                    const userId = document.getElementById('swal-return-user').value;
-                    
-                    if (!userId) {
-                        window.Swal.showValidationMessage('กรุณาเลือกลูกค้า');
-                        return false;
-                    }
-                    return { User_id: userId };
-                }
+                preConfirm: () => ({ rental_id: rental.Rental_id })
             });
 
             if (returnData) {
                 try {
                     await window.axios.post('/api/rentals/return', {
-                        User_id: returnData.User_id,
-                        Bg_id: bg.Bg_id
+                        rental_id: returnData.rental_id
                     });
                     
-                    window.Swal.fire({ icon: 'success', title: 'รับคืนสำเร็จ!', timer: 1500, showConfirmButton: false });
+                    const title = returnData ? 'Force คืนเกมสำเร็จ!' : 'รับคืนสำเร็จ!';
+                    window.Swal.fire({ icon: 'success', title, text: 'สถานะเกมถูกเปลี่ยนเป็นพร้อมให้เช่าแล้ว', timer: 1800, showConfirmButton: false });
                     this.fetchData(); // ดึงข้อมูลใหม่
                 } catch (error) {
                     window.Swal.fire({ icon: 'error', title: 'ทำรายการไม่สำเร็จ', text: error.response?.data?.message || 'เกิดข้อผิดพลาด' });

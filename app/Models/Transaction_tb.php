@@ -2,14 +2,11 @@
 
 namespace App\Models;
 
-use App\Jobs\AnchorTransactionOnPolygon;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Jobs\RecordPrivateBlockchainTransaction;
 use Illuminate\Database\Eloquent\Model;
 
 class Transaction_tb extends Model
 {
-    use HasFactory;
-
     protected $table = 'Transaction_tb';
     protected $primaryKey = 'Ts_id';
 
@@ -45,9 +42,7 @@ class Transaction_tb extends Model
         });
 
         static::created(function (Transaction_tb $transaction) {
-            if (config('services.polygon.enabled')) {
-                AnchorTransactionOnPolygon::dispatch((int) $transaction->Ts_id)->afterCommit();
-            }
+            RecordPrivateBlockchainTransaction::dispatch((int) $transaction->Ts_id)->afterCommit();
         });
     }
 

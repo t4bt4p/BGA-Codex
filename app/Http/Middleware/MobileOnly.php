@@ -10,6 +10,10 @@ class MobileOnly
 {
     public function handle(Request $request, Closure $next): Response
     {
+        if (! config('user_access.mobile_only', false)) {
+            return $next($request);
+        }
+
         // The administration panel is intentionally designed for desktop use.
         if ($request->is('admin') || $request->is('admin/*')) {
             return $next($request);

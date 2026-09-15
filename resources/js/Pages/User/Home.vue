@@ -1,5 +1,9 @@
 <template>
     <div class="d-flex flex-column fade-in">
+        <section class="desktop-welcome">
+            <div><p>เลือกเกม แล้วชวนเพื่อนมาเล่น</p><h1>เกมถัดไปของคุณ<br>เริ่มต้นที่นี่</h1><span>ค้นหาบอร์ดเกมที่ใช่ เลือกวันเช่า และชำระด้วยโทเคนในกระเป๋าของคุณ</span></div>
+            <div class="welcome-dice" aria-hidden="true"><span v-for="dot in 6" :key="dot"></span></div>
+        </section>
         <!-- Search & Filters -->
         <div class="bg-white px-3 py-3 sticky-top border-bottom search-panel" style="top: 0; z-index: 1020;">
             <div class="position-relative search-box">
@@ -11,7 +15,7 @@
             </div>
             <div class="category-scroll mt-3">
                 <button type="button" class="category-pill" :class="{ active: categoryFilter === '' }" @click="categoryFilter = ''">ทั้งหมด</button>
-                <button v-for="category in categories" :key="category.id" type="button" class="category-pill" :class="{ active: categoryFilter === String(category.id) }" @click="categoryFilter = String(category.id)">{{ category.name }}</button>
+                <button v-for="category in categories" :key="category.id" type="button" class="category-pill" :class="{ active: categoryFilter === category.id }" :aria-pressed="categoryFilter === category.id" @click="categoryFilter = category.id">{{ category.name }}</button>
             </div>
             <div v-if="showAdvancedFilters" class="advanced-filters mt-2">
                 <div>
@@ -40,7 +44,7 @@
         </div>
 
         <!-- รายการบอร์ดเกมจาก API -->
-        <div class="px-3 pb-4 d-flex flex-column gap-3">
+        <div class="game-grid px-3 pb-4">
             <div v-for="game in filteredGames" :key="game.Bg_id" class="card border-0 shadow-sm rounded-4 overflow-hidden bga-card" :class="{'opacity-75': game.Bg_use_status === 0}">
                 
                 <div class="bg-light position-relative d-flex align-items-center justify-content-center p-3" style="height: 180px;">
@@ -53,7 +57,7 @@
                     </div>
                 </div>
                 
-                <div class="card-body p-3">
+                <div class="card-body p-3 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <div>
                             <div class="badge bg-success bg-opacity-10 text-success mb-2 border border-success border-opacity-25">{{ game.category?.Bg_category_name || 'ทั่วไป' }}</div>
@@ -112,7 +116,14 @@ export default {
             const search = this.searchQuery.trim().toLocaleLowerCase('th');
             return this.boardgames.filter(game => {
                 const matchesName = String(game.Bg_name).toLocaleLowerCase('th').includes(search);
-                const matchesCategory = !this.categoryFilter || String(game.Bg_Catetogory_id) === this.categoryFilter;
+                const categoryName = String(game.category?.Bg_category_name || '').trim().toLowerCase();
+                const minPlayers = Number(game.Bg_min_player);
+                const maxPlayers = Number(game.Bg_max_player);
+                const matchesCategory = !this.categoryFilter
+                    || (this.categoryFilter === 'party' && ['ปาร์ตี้', 'ปาตี้', 'party', 'party game', 'party games'].includes(categoryName))
+                    || (this.categoryFilter === 'strategy' && ['กลยุทธ์', 'strategy', 'strategy game', 'strategy games'].includes(categoryName))
+                    || (this.categoryFilter === 'two' && minPlayers <= 2 && maxPlayers >= 2)
+                    || (this.categoryFilter === 'group' && maxPlayers >= 6);
                 const players = Number(this.playerFilter);
                 const matchesPlayers = !players || (players >= Number(game.Bg_min_player) && players <= Number(game.Bg_max_player));
                 const duration = Number(game.Bg_playduration);
@@ -124,11 +135,12 @@ export default {
             });
         },
         categories() {
-            const unique = new Map();
-            this.boardgames.forEach(game => {
-                if (game.category) unique.set(game.category.Bg_category_id, game.category.Bg_category_name);
-            });
-            return [...unique].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, 'th'));
+            return [
+                { id: 'party', name: 'ปาร์ตี้' },
+                { id: 'strategy', name: 'กลยุทธ์' },
+                { id: 'two', name: '2 คน' },
+                { id: 'group', name: 'หลายคน' },
+            ];
         },
         playerOptions() {
             const maximum = Math.max(0, ...this.boardgames.map(game => Number(game.Bg_max_player) || 0));

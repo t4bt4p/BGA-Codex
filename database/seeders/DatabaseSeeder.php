@@ -18,26 +18,41 @@ class DatabaseSeeder extends Seeder
     {
         $now = now();
         $adminUsername = env('ADMIN_USERNAME', 'admin');
-        if (($password = env('ADMIN_PASSWORD'))
-            && ! DB::table('User_tb')->where('User_username', $adminUsername)->exists()) {
-            DB::transaction(function () use ($adminUsername, $password, $now): void {
-                $walletId = DB::table('Wallet_tb')->insertGetId([
-                    'Wallet_count' => 0,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ], 'Wallet_id');
-                DB::table('User_tb')->insert([
-                    'User_username' => $adminUsername,
-                    'User_password' => Hash::make($password),
-                    'User_phone' => null,
-                    'User_name' => env('ADMIN_NAME', 'ผู้ดูแลระบบ'),
-                    'Wallet_id' => $walletId,
-                    'User_status' => 1,
-                    'User_role' => 'admin',
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]);
-            });
+        if ($password = env('ADMIN_PASSWORD')) {
+            $existingAdmin = DB::table('User_tb')
+                ->where('User_username', $adminUsername)
+                ->first();
+
+            if ($existingAdmin) {
+                DB::table('User_tb')
+                    ->where('User_id', $existingAdmin->User_id)
+                    ->update([
+                        'User_password' => Hash::make($password),
+                        'User_name' => env('ADMIN_NAME', 'ผู้ดูแลระบบ'),
+                        'User_status' => 1,
+                        'User_role' => 'admin',
+                        'updated_at' => $now,
+                    ]);
+            } else {
+                DB::transaction(function () use ($adminUsername, $password, $now): void {
+                    $walletId = DB::table('Wallet_tb')->insertGetId([
+                        'Wallet_count' => 0,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ], 'Wallet_id');
+                    DB::table('User_tb')->insert([
+                        'User_username' => $adminUsername,
+                        'User_password' => Hash::make($password),
+                        'User_phone' => null,
+                        'User_name' => env('ADMIN_NAME', 'ผู้ดูแลระบบ'),
+                        'Wallet_id' => $walletId,
+                        'User_status' => 1,
+                        'User_role' => 'admin',
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                });
+            }
         }
 
         $categories = collect(['ครอบครัว', 'ปริศนา', 'ปาร์ตี้', 'กลยุทธ์'])

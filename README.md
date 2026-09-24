@@ -42,6 +42,8 @@ npm run build
 
 ขั้นตอนเปิดรับ PromptPay จริงผ่าน Opn/Omise อยู่ที่ [docs/OPN_LIVE.md](docs/OPN_LIVE.md)
 
+ขั้นตอนนำระบบขึ้น Railway อยู่ที่ [docs/RAILWAY.md](docs/RAILWAY.md)
+
 ## การทดสอบ
 
 ```bash

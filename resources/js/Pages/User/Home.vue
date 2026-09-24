@@ -149,11 +149,11 @@ export default {
     },
     async mounted() {
         await this.fetchBoardgames();
-        window.Echo.channel('boardgames')
+        window.Echo?.channel('boardgames')
             .listen('.boardgame.status.changed', this.applyRealtimeStatus);
     },
     beforeUnmount() {
-        window.Echo.leave('boardgames');
+        window.Echo?.leave('boardgames');
     },
     methods: {
         applyRealtimeStatus(event) {

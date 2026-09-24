@@ -249,11 +249,11 @@ export default {
         
         this.boardgameModalInstance = new window.bootstrap.Modal(this.$refs.addBoardgameModal);
         this.categoryModalInstance = new window.bootstrap.Modal(this.$refs.categoryModal);
-        window.Echo.channel('boardgames')
+        window.Echo?.channel('boardgames')
             .listen('.boardgame.status.changed', this.applyRealtimeStatus);
     },
     beforeUnmount() {
-        window.Echo.leave('boardgames');
+        window.Echo?.leave('boardgames');
     },
     methods: {
         applyRealtimeStatus(event) {

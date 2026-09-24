@@ -149,12 +149,12 @@ export default {
     },
     mounted() {
         this.fetchReport();
-        window.Echo.channel('boardgames')
+        window.Echo?.channel('boardgames')
             .listen('.boardgame.status.changed', this.refreshRealtimeReport);
     },
     beforeUnmount() {
         clearTimeout(this.realtimeTimer);
-        window.Echo.leave('boardgames');
+        window.Echo?.leave('boardgames');
     },
     methods: {
         refreshRealtimeReport() {

@@ -117,11 +117,11 @@ export default {
     },
     mounted() {
         this.fetchData();
-        window.Echo.channel('boardgames')
+        window.Echo?.channel('boardgames')
             .listen('.boardgame.status.changed', this.applyRealtimeStatus);
     },
     beforeUnmount() {
-        window.Echo.leave('boardgames');
+        window.Echo?.leave('boardgames');
     },
     methods: {
         rentalTotal(bg) {

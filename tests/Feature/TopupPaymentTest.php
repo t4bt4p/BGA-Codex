@@ -6,6 +6,7 @@ use App\Models\Topup_request_tb;
 use App\Models\User;
 use App\Models\Wallet_tb;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -131,5 +132,29 @@ class TopupPaymentTest extends TestCase
         $this->assertSame(20, (int) $wallet->fresh()->Wallet_count);
         $this->assertSame('pending', $topup->fresh()->Status);
         $this->assertDatabaseCount('Transaction_tb', 0);
+    }
+
+    public function test_qr_provider_timeout_falls_back_to_the_signed_image_url(): void
+    {
+        [$user] = $this->payment();
+        Sanctum::actingAs($user);
+        $downloadUri = 'https://qr.example.test/slow-image';
+        Http::fake(function ($request) use ($downloadUri) {
+            if ($request->url() === 'https://api.omise.co/charges') {
+                return Http::response([
+                    'id' => 'chrg_slow_qr',
+                    'status' => 'pending',
+                    'paid' => false,
+                    'livemode' => false,
+                    'source' => ['scannable_code' => ['image' => ['download_uri' => $downloadUri]]],
+                ]);
+            }
+
+            throw new ConnectionException('QR download timed out');
+        });
+
+        $this->postJson('/api/topups', ['amount' => 20])
+            ->assertCreated()
+            ->assertJsonPath('charge.qr_data', $downloadUri);
     }
 }

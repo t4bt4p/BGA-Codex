@@ -2,19 +2,21 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Http\Controllers\Controller;
 use App\Events\BoardgameStatusChanged;
+use App\Http\Controllers\Controller;
 use App\Models\Boardgame_tb;
 use App\Models\Rental_tb;
 use App\Models\Topup_request_tb;
 use App\Models\Transaction_tb;
 use App\Models\User;
-use App\Services\TopupSettlementService;
 use App\Services\OpnConfiguration;
+use App\Services\OverdueAccountService;
+use App\Services\TopupSettlementService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Throwable;
 
 class RentalController extends Controller
 {
@@ -30,7 +32,7 @@ class RentalController extends Controller
             $u = User::with('wallet')->findOrFail($r->User_id);
         }
 
-        app(\App\Services\OverdueAccountService::class)->suspendIfOverdue($u);
+        app(OverdueAccountService::class)->suspendIfOverdue($u);
         abort_if((int) $u->User_status !== 1, 403, 'บัญชีนี้ถูกระงับ ไม่สามารถเช่าบอร์ดเกมได้');
 
         return DB::transaction(function () use ($r, $u) {
@@ -127,11 +129,11 @@ class RentalController extends Controller
             ->connectTimeout(5)
             ->timeout(20)
             ->asForm()->post('https://api.omise.co/charges', [
-            'amount' => (int) $r->amount * 100,
-            'currency' => 'THB',
-            'source[type]' => 'promptpay',
-            'metadata[reference]' => $reference,
-        ]);
+                'amount' => (int) $r->amount * 100,
+                'currency' => 'THB',
+                'source[type]' => 'promptpay',
+                'metadata[reference]' => $reference,
+            ]);
         if (! $charge->successful()) {
             $topup->delete();
 
@@ -148,19 +150,19 @@ class RentalController extends Controller
         $topup->update(['Provider_charge_id' => $data['id'] ?? null]);
         $downloadUri = $data['source']['scannable_code']['image']['download_uri'] ?? null;
         if ($downloadUri) {
-            // QR image retrieval must not leave the charge request hanging forever.
-            $image = Http::withBasicAuth(config('services.opn.secret_key'), '')
-                ->connectTimeout(1)
-                ->timeout(2)
-                ->get($downloadUri);
-            if ($image->successful()) {
-                $data['qr_data'] = 'data:'.($image->header('Content-Type') ?: 'image/png').';base64,'.base64_encode($image->body());
-            } else {
-                // The provider URL is already a usable QR image fallback.
+            try {
+                // Embed the QR when possible; Railway can occasionally receive the
+                // provider image too slowly, so the signed URL remains the fallback.
+                $image = Http::withBasicAuth(config('services.opn.secret_key'), '')
+                    ->connectTimeout(2)
+                    ->timeout(8)
+                    ->get($downloadUri);
+                $data['qr_data'] = $image->successful()
+                    ? 'data:'.($image->header('Content-Type') ?: 'image/png').';base64,'.base64_encode($image->body())
+                    : $downloadUri;
+            } catch (Throwable) {
                 $data['qr_data'] = $downloadUri;
             }
-        } elseif (! empty($data['source']['scannable_code']['image']['download_uri'])) {
-            $data['qr_data'] = $data['source']['scannable_code']['image']['download_uri'];
         }
 
         return response()->json(['status' => 'success', 'topup' => $topup->fresh(), 'charge' => $data], 201);

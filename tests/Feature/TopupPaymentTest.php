@@ -21,7 +21,10 @@ class TopupPaymentTest extends TestCase
         parent::setUp();
         Queue::fake();
         Http::preventStrayRequests();
-        config(['services.opn.secret_key' => 'test-key']);
+        config([
+            'services.opn.secret_key' => 'skey_test_example',
+            'services.opn.live_mode' => false,
+        ]);
     }
 
     private function payment(): array
@@ -38,6 +41,7 @@ class TopupPaymentTest extends TestCase
         ]);
         $charge = [
             'id' => 'chrg_test100', 'status' => 'successful', 'paid' => true,
+            'livemode' => false,
             'amount' => 10000, 'currency' => 'THB', 'metadata' => ['reference' => 'REF100'],
         ];
 
@@ -66,6 +70,7 @@ class TopupPaymentTest extends TestCase
         Sanctum::actingAs($user);
         Http::fake(['api.omise.co/charges' => Http::response([
             'id' => 'chrg_new', 'status' => 'pending', 'paid' => false,
+            'livemode' => false,
             'source' => ['scannable_code' => ['image' => ['download_uri' => 'https://qr.example.test/image']]],
         ]), 'qr.example.test/image' => Http::response('qr-image', 200, ['Content-Type' => 'image/png'])]);
         $this->postJson('/api/topups', ['amount' => 50])->assertCreated()
@@ -112,5 +117,19 @@ class TopupPaymentTest extends TestCase
         $this->postJson('/api/webhooks/opn', ['key' => 'charge.complete', 'data' => $charge])->assertOk();
         $this->assertSame(120, (int) $wallet->fresh()->Wallet_count);
         $this->assertSame(0, (int) $user->fresh()->User_status);
+    }
+
+    public function test_test_charge_is_rejected_when_live_mode_is_enabled(): void
+    {
+        [, $wallet, $topup, $charge] = $this->payment();
+        config(['services.opn.live_mode' => true]);
+        Http::fake(['api.omise.co/charges/*' => Http::response($charge)]);
+
+        $this->postJson('/api/webhooks/opn', ['key' => 'charge.complete', 'data' => $charge])
+            ->assertStatus(500);
+
+        $this->assertSame(20, (int) $wallet->fresh()->Wallet_count);
+        $this->assertSame('pending', $topup->fresh()->Status);
+        $this->assertDatabaseCount('Transaction_tb', 0);
     }
 }

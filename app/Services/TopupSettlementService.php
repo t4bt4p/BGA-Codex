@@ -11,6 +11,10 @@ use RuntimeException;
 
 class TopupSettlementService
 {
+    public function __construct(private readonly OpnConfiguration $opnConfiguration)
+    {
+    }
+
     public function sync(Topup_request_tb $topup): Topup_request_tb
     {
         if ($topup->Status === 'approved') {
@@ -29,6 +33,8 @@ class TopupSettlementService
         if (! $charge->successful() || $charge->json('id') !== $topup->Provider_charge_id) {
             throw new RuntimeException('ไม่สามารถยืนยัน Charge กับ Opn ได้');
         }
+
+        $this->opnConfiguration->assertChargeMode($charge->json());
 
         if ($charge->json('status') !== 'successful' || $charge->json('paid') !== true) {
             return $topup->fresh();

@@ -16,18 +16,29 @@
                             class="text-success">Vault</span></span>
                 </div>
 
+                <div class="desktop-header-copy d-none d-lg-flex flex-column">
+                    <span>พื้นที่สมาชิก</span>
+                    <strong>{{ pageTitle }}</strong>
+                </div>
+
                 <div class="d-flex align-items-center gap-3">
                     <button v-if="userProfile" class="desktop-action btn btn-success rounded-pill px-4" @click="openTopupModal">เติมโทเคน</button>
                     <router-link v-else class="desktop-action btn btn-success rounded-pill px-4" :to="{ name: 'user.login' }">เข้าสู่ระบบ</router-link>
-                    <div
-                        class="badge rounded-pill bg-success bg-opacity-10 text-success border border-success d-flex align-items-center gap-2 px-3 py-1">
+                    <div class="topbar-wallet badge rounded-pill bg-success bg-opacity-10 text-success border border-success d-flex align-items-center gap-2 px-3 py-1">
                         <!-- 🎯 ยอดเงินจะเปลี่ยนตรงนี้ทันทีแบบ Real-time -->
-                        <span class="fw-bold fs-6">{{ userProfile?.wallet?.Wallet_count || 0 }}</span>
+                        <i class="fa-solid fa-coins" aria-hidden="true"></i>
+                        <span class="fw-bold fs-6">{{ Number(userProfile?.wallet?.Wallet_count || 0).toLocaleString() }}</span>
+                        <small>โทเคน</small>
                         <div class="bg-success rounded-circle" style="width: 8px; height: 8px;"></div>
                     </div>
-                    <router-link :to="{ name: 'user.profile' }" aria-label="บัญชีของฉัน"><img src="https://i.pravatar.cc/150?img=11" alt=""
-                        class="rounded-circle border border-2 border-white shadow-sm"
-                        style="width: 32px; height: 32px; object-fit: cover;"></router-link>
+                    <router-link class="desktop-profile-link" :to="{ name: 'user.profile' }" aria-label="บัญชีของฉัน">
+                        <span class="desktop-profile-name d-none d-xl-flex" v-if="userProfile">
+                            <strong>{{ userProfile.User_name }}</strong><small>บัญชีของฉัน</small>
+                        </span>
+                        <img src="https://i.pravatar.cc/150?img=11" alt="รูปโปรไฟล์"
+                            class="rounded-circle border border-2 border-white shadow-sm"
+                            style="width: 36px; height: 36px; object-fit: cover;">
+                    </router-link>
                 </div>
             </header>
 
@@ -121,6 +132,16 @@ export default {
             userProfile: null,
             accountCheckTimer: null
         }
+    },
+    computed: {
+        pageTitle() {
+            return {
+                'user.home': 'ค้นหาบอร์ดเกม',
+                'user.mygames': 'เกมของฉัน',
+                'user.history': 'ประวัติธุรกรรม',
+                'user.profile': 'บัญชีของฉัน',
+            }[this.$route.name] || 'BGA Vault';
+        },
     },
     async mounted() {
         await this.fetchUserProfile();

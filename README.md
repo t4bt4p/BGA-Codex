@@ -40,6 +40,8 @@ npm run build
 
 รายละเอียดการเชื่อม Polygon อยู่ที่ [docs/POLYGON_AMOY.md](docs/POLYGON_AMOY.md)
 
+ขั้นตอนเปิดรับ PromptPay จริงผ่าน Opn/Omise อยู่ที่ [docs/OPN_LIVE.md](docs/OPN_LIVE.md)
+
 ## การทดสอบ
 
 ```bash

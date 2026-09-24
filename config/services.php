@@ -38,7 +38,8 @@ return [
     'opn' => [
         'public_key' => env('OPN_PUBLIC_KEY'),
         'secret_key' => env('OPN_SECRET_KEY'),
-        'webhook_secret' => env('OPN_WEBHOOK_SECRET'),
+        // Keep this explicit so a test charge can never be accepted as a live payment.
+        'live_mode' => (bool) env('OPN_LIVE_MODE', false),
     ],
 
     'polygon' => [

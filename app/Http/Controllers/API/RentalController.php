@@ -10,6 +10,7 @@ use App\Models\Topup_request_tb;
 use App\Models\Transaction_tb;
 use App\Models\User;
 use App\Services\TopupSettlementService;
+use App\Services\OpnConfiguration;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -112,10 +113,14 @@ class RentalController extends Controller
         return Rental_tb::with(['user', 'boardgame'])->latest('rented_at')->get();
     }
 
-    public function createTopupRequest(Request $r)
+    public function createTopupRequest(Request $r, OpnConfiguration $opnConfiguration)
     {
         $r->validate(['amount' => 'required|integer|in:20,50,100,500,1000']);
-        abort_unless(config('services.opn.secret_key'), 503, 'ยังไม่ได้ตั้งค่า Opn secret key');
+        try {
+            $opnConfiguration->assertUsable();
+        } catch (\RuntimeException $exception) {
+            abort(503, $exception->getMessage());
+        }
         $reference = strtoupper(Str::random(12));
         $topup = Topup_request_tb::create(['User_id' => $r->user()->User_id, 'Amount' => $r->amount, 'Reference' => $reference]);
         $charge = Http::withBasicAuth(config('services.opn.secret_key'), '')
@@ -133,6 +138,13 @@ class RentalController extends Controller
             return response()->json(['message' => 'ไม่สามารถสร้างรายการชำระเงินกับ Opn ได้', 'provider' => $charge->json()], 422);
         }
         $data = $charge->json();
+        try {
+            $opnConfiguration->assertChargeMode($data);
+        } catch (\RuntimeException $exception) {
+            $topup->delete();
+
+            return response()->json(['message' => $exception->getMessage()], 502);
+        }
         $topup->update(['Provider_charge_id' => $data['id'] ?? null]);
         $downloadUri = $data['source']['scannable_code']['image']['download_uri'] ?? null;
         if ($downloadUri) {

@@ -17,32 +17,42 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $now = now();
-        if ($password = env('ADMIN_PASSWORD')) {
-            $walletId = DB::table('Wallet_tb')->insertGetId([
-                'Wallet_count' => 0,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ], 'Wallet_id');
-            DB::table('User_tb')->insert([
-                'User_username' => env('ADMIN_USERNAME', 'admin'),
-                'User_password' => Hash::make($password),
-                'User_phone' => null,
-                'User_name' => env('ADMIN_NAME', 'ผู้ดูแลระบบ'),
-                'Wallet_id' => $walletId,
-                'User_status' => 1,
-                'User_role' => 'admin',
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
+        $adminUsername = env('ADMIN_USERNAME', 'admin');
+        if (($password = env('ADMIN_PASSWORD'))
+            && ! DB::table('User_tb')->where('User_username', $adminUsername)->exists()) {
+            DB::transaction(function () use ($adminUsername, $password, $now): void {
+                $walletId = DB::table('Wallet_tb')->insertGetId([
+                    'Wallet_count' => 0,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ], 'Wallet_id');
+                DB::table('User_tb')->insert([
+                    'User_username' => $adminUsername,
+                    'User_password' => Hash::make($password),
+                    'User_phone' => null,
+                    'User_name' => env('ADMIN_NAME', 'ผู้ดูแลระบบ'),
+                    'Wallet_id' => $walletId,
+                    'User_status' => 1,
+                    'User_role' => 'admin',
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            });
         }
 
         $categories = collect(['ครอบครัว', 'ปริศนา', 'ปาร์ตี้', 'กลยุทธ์'])
             ->mapWithKeys(function (string $name) use ($now) {
-                $id = DB::table('Boardgame_category_tb')->insertGetId([
-                    'Bg_category_name' => $name,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ], 'Bg_category_id');
+                $id = DB::table('Boardgame_category_tb')
+                    ->where('Bg_category_name', $name)
+                    ->value('Bg_category_id');
+
+                if (! $id) {
+                    $id = DB::table('Boardgame_category_tb')->insertGetId([
+                        'Bg_category_name' => $name,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ], 'Bg_category_id');
+                }
 
                 return [$name => $id];
             });
@@ -54,6 +64,10 @@ class DatabaseSeeder extends Seeder
             ['ผู้บุกเบิกกาแล็กซี', 80, 2, 4, 90, 'กลยุทธ์'],
             ['คำต้องห้าม', 25, 4, 10, 20, 'ปาร์ตี้'],
         ] as [$name, $cost, $min, $max, $duration, $category]) {
+            if (DB::table('Boardgame_tb')->where('Bg_name', $name)->exists()) {
+                continue;
+            }
+
             DB::table('Boardgame_tb')->insert([
                 'Bg_name' => $name,
                 'Bg_cost' => $cost,

@@ -1,0 +1,25 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class Boardgame_Category_tb extends Model
+{
+    // 1. ระบุชื่อตารางให้ชัดเจน
+    protected $table = 'Boardgame_category_tb';
+
+    // 2. ระบุชื่อ Primary Key (เพราะของเราไม่ได้ชื่อ id)
+    protected $primaryKey = 'Bg_category_id';
+
+    // 3. อนุญาตให้บันทึกคอลัมน์นี้ผ่านคำสั่ง create() ได้
+    protected $fillable = [
+        'Bg_category_name',
+    ];
+
+    public function boardgames(): HasMany
+    {
+        return $this->hasMany(Boardgame_tb::class, 'Bg_Catetogory_id', 'Bg_category_id');
+    }
+}

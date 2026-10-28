@@ -25,3 +25,17 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+**/node_modules/
+**/vendor/
+**/dist/
+**/public/build/
+**/public/hot
+**/public/storage
+**/storage/*.key
+**/storage/pail/
+**/.phpunit.cache/
+**/database/*.sqlite*
+/POL Wallet.text
+
+**/public/admin-ui/

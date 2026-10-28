@@ -1,0 +1,14 @@
+node_modules
+vendor
+.env
+.env.*
+!.env.example
+public/build
+public/storage
+dist
+database/*.sqlite*
+storage
+**/node_modules
+**/.env
+**/.env.*
+public/admin-ui

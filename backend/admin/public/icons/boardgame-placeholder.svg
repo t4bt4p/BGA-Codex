@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" role="img" aria-label="ภาพบอร์ดเกม">
+  <rect width="320" height="200" rx="20" fill="#f0fdf4"/>
+  <g fill="#fff" stroke="#16a34a" stroke-width="4">
+    <rect x="84" y="42" width="92" height="116" rx="12" transform="rotate(-12 130 100)"/>
+    <rect x="144" y="64" width="84" height="84" rx="15" transform="rotate(12 186 106)"/>
+  </g>
+  <g fill="#16a34a"><circle cx="128" cy="80" r="9"/><circle cx="130" cy="120" r="9"/><circle cx="170" cy="88" r="6"/><circle cx="200" cy="90" r="6"/><circle cx="186" cy="107" r="6"/><circle cx="170" cy="124" r="6"/><circle cx="200" cy="126" r="6"/></g>
+</svg>

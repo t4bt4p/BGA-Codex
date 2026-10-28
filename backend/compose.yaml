@@ -1,0 +1,72 @@
+name: bga-codex
+x-backend: &backend
+    build:
+        context: .
+        args:
+            VITE_REVERB_APP_KEY: ${REVERB_APP_KEY:-}
+            VITE_REVERB_HOST: ${VITE_REVERB_HOST:-localhost}
+            VITE_REVERB_PORT: ${VITE_REVERB_PORT:-8081}
+    env_file: ./.env
+    environment: &backend-env
+        DB_CONNECTION: mysql
+        DB_HOST: db
+        DB_PORT: 3306
+        DB_DATABASE: ${DB_DATABASE:-bga}
+        DB_USERNAME: ${DB_USERNAME:-bga}
+        DB_PASSWORD: ${DB_PASSWORD:-bga_local_password}
+        REVERB_HOST: reverb
+        REVERB_PORT: 8080
+        REVERB_SCHEME: http
+    volumes:
+        - backend-storage:/app/storage
+    depends_on:
+        db:
+            condition: service_healthy
+services:
+    frontend:
+        build:
+            context: ../frontend
+            args:
+                VITE_REVERB_APP_KEY: ${REVERB_APP_KEY:-}
+                VITE_REVERB_HOST: ${VITE_REVERB_HOST:-localhost}
+                VITE_REVERB_PORT: ${VITE_REVERB_PORT:-8081}
+        ports:
+            - '${FRONTEND_PORT:-5173}:80'
+        depends_on:
+            - backend
+    backend:
+        <<: *backend
+        ports:
+            - '127.0.0.1:${BACKEND_PORT:-8000}:8000'
+    db:
+        image: mysql:8.4
+        environment:
+            MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-bga_local_root_password}
+            MYSQL_DATABASE: ${DB_DATABASE:-bga}
+            MYSQL_USER: ${DB_USERNAME:-bga}
+            MYSQL_PASSWORD: ${DB_PASSWORD:-bga_local_password}
+        ports:
+            - '127.0.0.1:${DB_PORT:-3307}:3306'
+        volumes:
+            - mysql-data:/var/lib/mysql
+        healthcheck:
+            test: ['CMD-SHELL', 'mysqladmin ping -h localhost -uroot -p"$$MYSQL_ROOT_PASSWORD" --silent']
+            interval: 5s
+            timeout: 5s
+            retries: 30
+    queue:
+        <<: *backend
+        command: php artisan queue:work --tries=5 --timeout=150
+        restart: unless-stopped
+    scheduler:
+        <<: *backend
+        command: php artisan schedule:work
+        restart: unless-stopped
+    reverb:
+        <<: *backend
+        command: php artisan reverb:start --host=0.0.0.0 --port=8080
+        ports:
+            - '${REVERB_PORT:-8081}:8080'
+volumes:
+    mysql-data:
+    backend-storage:

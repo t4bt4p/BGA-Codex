@@ -1,0 +1,12 @@
+node_modules/
+vendor/
+dist/
+.env
+.env.*
+!.env.example
+!.env.compose.example
+public/admin-ui/
+public/build/
+public/hot
+public/storage
+.phpunit.result.cache

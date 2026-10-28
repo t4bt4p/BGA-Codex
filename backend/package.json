@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "polygon:deploy": "node scripts/polygon-deploy.mjs"
+  },
+  "dependencies": {
+    "ethers": "^6.17.0",
+    "solc": "^0.8.36"
+  }
+}
